@@ -2,6 +2,11 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.2 — 2026-11-02
+
+### Changed
+- Version bump for GitHub Pages publish.
+
 ## 0.3.1 — 2026-11-02
 
 ### Added

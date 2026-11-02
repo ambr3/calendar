@@ -2,7 +2,7 @@
   "name": "Seclusa Calendar",
   "short_name": "Calendar",
   "description": "Privacy-first calendar. All data stays on your device.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",
