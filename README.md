@@ -25,7 +25,8 @@ Screen".
 
 ## HTTP Observatory
 
-GitHub Pages cannot set framing / nosniff response headers, so Observatory grades this **B** — those −20/−5 knobs matter little here (no login, payments, or privileged actions; browsers already type JS/CSS correctly). What actually protects you is already in the pages: no third-party calls, `connect-src 'none'`, no unsafe inline/eval, local-only data. See [Scan results - HTTP Observatory _ MDN.pdf](Scan%20results%20-%20HTTP%20Observatory%20_%20MDN.pdf).
+GitHub Pages cannot set framing / nosniff response headers, so Observatory grades this **B** — those −20/−5 knobs matter little here (no login, payments, or privileged actions; browsers already type JS/CSS correctly).
+What actually protects you is already in the pages: no third-party calls, `connect-src 'none'`, no unsafe inline/eval, local-only data. ([scan PDF](Scan%20results%20-%20HTTP%20Observatory%20_%20MDN.pdf))
 
 ## License
 
