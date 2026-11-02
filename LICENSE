@@ -1,0 +1,13 @@
+Seclusa Calendar — licensing
+============================
+
+The calendar is released under the GNU General Public License v3.0.
+
+  → GNU General Public License v3.0
+  → see LICENSE-GPL-3.0
+
+Bundled DM Sans and Sora fonts retain their SIL Open Font License 1.1 terms;
+their notices are in assets/fonts/.
+
+When distributing the app, meet GPL-3.0 for the calendar code and include the
+SIL Open Font License notices for the fonts.

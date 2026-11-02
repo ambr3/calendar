@@ -1,0 +1,203 @@
+/* Shared shell styles for Seclusa Calendar: fonts, palette, the bottom nav,
+   sheets and dialogs. Calendar-specific rules live in calendar/theme.css,
+   which is linked after this file. */
+/* Palette lives in seclusa-base.css (linked ahead of this file). */
+@font-face{
+  font-family:"DM Sans";font-style:normal;font-weight:400;font-display:swap;
+  src:url("assets/fonts/dm-sans-latin-400-normal.woff2") format("woff2");
+}
+@font-face{
+  font-family:"DM Sans";font-style:normal;font-weight:600;font-display:swap;
+  src:url("assets/fonts/dm-sans-latin-600-normal.woff2") format("woff2");
+}
+@font-face{
+  font-family:"DM Sans";font-style:normal;font-weight:700;font-display:swap;
+  src:url("assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2");
+}
+@font-face{
+  font-family:Sora;font-style:normal;font-weight:600;font-display:swap;
+  src:url("assets/fonts/sora-latin-600-normal.woff2") format("woff2");
+}
+@font-face{
+  font-family:Sora;font-style:normal;font-weight:700;font-display:swap;
+  src:url("assets/fonts/sora-latin-700-normal.woff2") format("woff2");
+}
+@font-face{
+  font-family:Sora;font-style:normal;font-weight:800;font-display:swap;
+  src:url("assets/fonts/sora-latin-800-normal.woff2") format("woff2");
+}
+:root{
+  --font-body:"DM Sans",system-ui,sans-serif;
+  --font-display:Sora,"DM Sans",system-ui,sans-serif;
+  --radius:10px;
+  --shadow:0 1px 3px rgba(0,0,0,.13),0 1px 2px rgba(0,0,0,.09);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --shadow:0 1px 3px rgba(0,0,0,.5); }
+}
+/* Alias used by calendar/theme.css. Palette itself is only in seclusa-base.css. */
+:root{ --accent-color:var(--accent); }
+*{box-sizing:border-box}
+/* Class-based display rules outrank the UA [hidden] style, so state it. */
+[hidden]{display:none !important}
+html,body{height:100%}
+/* Tapping a card must not wait for the 300ms tap delay or trigger a zoom. */
+button,input,textarea,.card{ -webkit-tap-highlight-color:transparent }
+.card{ -webkit-touch-callout:none; user-select:none }
+input,textarea{ font-size:16px }
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font:15px/1.5 var(--font-body);
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
+}
+body.pane-calendar{font-family:var(--font-body)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--warm);outline-offset:2px}
+
+/* ---------- menu pill ---------- */
+.menupill{
+  height:38px;min-width:38px;padding:0 12px;flex:none;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border-radius:999px;border:1px solid var(--border);
+  background:transparent;color:var(--text);
+  box-shadow:none;font:inherit;font-weight:600;font-size:13px;
+  transition:background .15s,border-color .15s,color .15s,transform .12s;
+}
+.menupill:hover{background:var(--surface-2);border-color:var(--accent);color:var(--text)}
+.menupill:active{transform:scale(.96)}
+.menupill[aria-pressed=true],.menupill[aria-expanded=true]{
+  color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-color:color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+.menupill svg{
+  width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;
+}
+
+/* ---------- app shell ---------- */
+html,body{height:100%}
+:root{--app-nav-h:calc(72px + env(safe-area-inset-bottom, 0px))}
+body{
+  display:flex;flex-direction:column;min-height:100%;
+  padding-bottom:var(--app-nav-h);
+}
+.app-pane{flex:1;min-height:0;position:relative}
+#pane-calendar[hidden]{display:none !important}
+#pane-calendar:not([hidden]){
+  display:flex;flex-direction:column;min-height:0;max-height:100%;overflow:hidden;
+}
+
+#app-nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:25;
+  display:flex;gap:4px;justify-content:center;
+  min-height:var(--app-nav-h);
+  padding:6px 12px calc(6px + env(safe-area-inset-bottom, 0px));
+  background:var(--surface);border-top:1px solid var(--border);
+}
+#app-nav .app-nav-btn{
+  flex:1;max-width:140px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding:8px 4px;border-radius:var(--radius);color:var(--text-dim);font-size:11px;font-weight:500;
+}
+#app-nav .app-nav-btn svg{
+  width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+}
+#app-nav .app-nav-btn:hover{background:var(--surface-2);color:var(--text)}
+#app-nav .app-nav-btn[aria-current=page]{color:var(--accent)}
+
+/* ---------- panels, dialogs ---------- */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .15s}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);
+  border-radius:20px 20px 0 0;padding:6px 10px calc(12px + env(safe-area-inset-bottom));
+  transform:translateY(100%);visibility:hidden;max-height:85vh;overflow-y:auto;
+  transition:transform .2s cubic-bezier(.2,.8,.2,1), visibility 0s linear .2s;
+  box-shadow:0 -8px 32px rgba(0,0,0,.22);
+  border:1px solid var(--border);border-bottom:none;
+}
+.sheet.open{transform:none;visibility:visible;transition:transform .2s cubic-bezier(.2,.8,.2,1), visibility 0s}
+.sheet-handle{
+  width:36px;height:4px;border-radius:999px;background:var(--border);
+  margin:4px auto 10px;
+}
+.sheet h3{
+  margin:2px 14px 8px;font-size:12px;font-weight:700;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:.08em;
+}
+.sheet button.row{
+  display:flex;align-items:center;gap:14px;width:100%;padding:13px 14px;
+  border-radius:12px;text-align:left;font-weight:500;
+}
+.sheet button.row:hover{background:var(--surface-2)}
+.sheet button.row.active{
+  background:color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color:var(--accent);
+}
+.sheet button.row svg{
+  width:21px;height:21px;flex:none;fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;color:var(--text-dim);
+}
+.sheet button.row.active svg{color:var(--accent)}
+.sheet button.row.danger{color:var(--danger)}
+.sheet button.row.danger svg{color:var(--danger)}
+.sheet .sep{height:1px;background:var(--border);margin:8px 10px}
+.sheet .note{padding:8px 14px;color:var(--text-dim);font-size:13px;line-height:1.5}
+.about-body{padding:4px 14px 12px;color:var(--text-dim);font-size:14px;line-height:1.55}
+.about-body .about-title{color:var(--text);font-size:17px;font-weight:700;margin:0 0 4px}
+.about-body .about-version{margin:0 0 10px;font-size:13px;color:var(--text-dim)}
+.about-body h4{margin:14px 0 4px;font-size:12px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em}
+.about-body p{margin:0 0 8px}
+.about-body a{color:var(--accent);word-break:break-word}
+.about-warn{color:var(--text);background:color-mix(in srgb, var(--warn) 14%, var(--surface));border:1px solid color-mix(in srgb, var(--warn) 40%, var(--border));border-radius:10px;padding:10px 12px}
+.sheet .note.about-warn{margin:4px 10px 10px}
+.field{padding:10px 14px;display:flex;align-items:center;gap:12px}
+.field label{flex:1}
+.field input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent)}
+.field select{
+  background:var(--surface-2);border:none;border-radius:8px;padding:6px 9px;font:inherit;color:inherit;
+}
+/* Kept as classes rather than style="" attributes so a strict CSP needs no
+   'unsafe-inline' for styles. */
+.text-field, .dt-field{
+  background:var(--surface-2);border:none;border-radius:8px;color:inherit;
+}
+.text-field{flex:1;padding:9px 12px}
+.dt-field{padding:8px 10px}
+.chip-row{display:flex;gap:5px;flex-wrap:wrap}
+.rem-preview{padding:2px 14px 8px}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom));transform:translate(-50%,20px);z-index:60;
+  background:var(--text);color:var(--surface);padding:11px 18px;border-radius:99px;font-size:14px;
+  opacity:0;transition:opacity .18s,transform .18s;pointer-events:none;max-width:90vw;text-align:center;
+}
+.toast.open{opacity:1;transform:translate(-50%,0)}
+
+dialog{
+  border:none;border-radius:14px;background:var(--surface);color:var(--text);padding:0;
+  width:min(400px,92vw);box-shadow:0 12px 40px rgba(0,0,0,.4);
+}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0;padding:18px 20px 6px;font-size:17px}
+dialog .body{padding:0 20px 4px;color:var(--text-dim);font-size:14px;line-height:1.5}
+dialog .body input{
+  width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);
+}
+dialog .body input:focus{outline:none;border-color:var(--accent)}
+dialog .acts{display:flex;gap:8px;justify-content:flex-end;padding:14px 20px 18px}
+dialog .acts button{padding:9px 18px;border-radius:99px;font-weight:500}
+dialog .acts .primary{background:var(--accent);color:var(--accent-text)}
+dialog .acts .ghost{background:var(--surface-2)}
+.vault-state{font-size:12px;color:var(--text-dim);padding:2px 14px 10px;display:flex;align-items:center;gap:7px}
+.vault-state .dot{width:7px;height:7px;border-radius:50%;background:var(--text-dim);flex:none}
+.vault-state.on .dot{background:var(--ok)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@media (min-width:700px){
+  .sheet{left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-46%) scale(.96);
+    width:min(440px,92vw);border-radius:14px;opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .15s,transform .15s,visibility 0s linear .15s}
+  .sheet.open{transform:translate(-50%,-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto;
+    transition:opacity .15s,transform .15s,visibility 0s}
+}
