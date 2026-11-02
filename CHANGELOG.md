@@ -2,6 +2,17 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.3 — 2026-11-02
+
+### Fixed
+- Reminders for multi-day timed events fire on each day of the span.
+- JSON Replace clears countdowns and settings when the file omits them.
+- iCalendar import offers merge/replace; UTC (`Z`) timestamps map to local day/time.
+- Holidays and important dates expand when navigating outside the initial year window.
+- Search jumps to the next occurrence of a recurring event.
+- Reminder dedupe survives a reload; same-day `endTime` before `time` is dropped.
+- Recurrence day math no longer drifts across DST; unused `src/recurrence.js` is no longer loaded.
+
 ## 0.3.2 — 2026-11-02
 
 ### Changed

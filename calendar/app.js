@@ -57,7 +57,14 @@
   }
 
   function dayOffset(fromKey, toKey) {
-    return Math.round((parseDateKey(toKey).getTime() - parseDateKey(fromKey).getTime()) / 86400000);
+    /* UTC midnight of each calendar day — local ms/86400000 drifts across DST. */
+    const a = parseDateKey(fromKey);
+    const b = parseDateKey(toKey);
+    return Math.round(
+      (Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) -
+        Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) /
+        86400000,
+    );
   }
 
   function timeToMinutes(t) {
@@ -257,9 +264,12 @@
   const HOLIDAYS_STORAGE_KEY = 'privacy_calendar_holidays_v2';
   const SETTINGS_KEY = 'ambr3_calendar_settings';
   const APP_NAME_KEY = 'ambr3_calendar_appname';
+  const NOTIFIED_STORAGE_KEY = 'privacy_calendar_notified';
   const HOLIDAY_COLOR = '#dc2626';
   const IMPORTANT_COLOR = '#f97316';
   const STORAGE_MAX_BYTES = 4 * 1024 * 1024;
+  const DEFAULT_COUNTRIES = ['uk'];
+  const DEFAULT_IMPORTANT_DATES = ['valentines', 'halloween', 'mothers_day', 'fathers_day', 'new_years_eve'];
 
   function createInitialState() {
     return {
@@ -270,10 +280,12 @@
       lang: 'en',
       appName: '',
       events: {},
-      selectedCountries: ['uk'],
-      enabledImportantDates: ['valentines', 'halloween', 'mothers_day', 'fathers_day', 'new_years_eve'],
+      selectedCountries: DEFAULT_COUNTRIES.slice(),
+      enabledImportantDates: DEFAULT_IMPORTANT_DATES.slice(),
       allCountryHolidays: {},
       importantDatesData: {},
+      holidayCoverFrom: null,
+      holidayCoverTo: null,
       dragEvent: null,
       notifiedEvents: {},
       editingKey: null,
@@ -291,6 +303,10 @@
     e.time = timeRe.test(ev.time || '') ? ev.time : null;
     e.endTime = timeRe.test(ev.endTime || '') ? ev.endTime : null;
     e.endDate = dateRe.test(ev.endDate || '') ? ev.endDate : null;
+    /* Same-day end before start is invalid; overnight spans use endDate. */
+    if (e.time && e.endTime && !e.endDate && timeToMinutes(e.endTime) <= timeToMinutes(e.time)) {
+      e.endTime = null;
+    }
     const rem = typeof ev.reminder === 'number' ? ev.reminder : Number(ev.reminder);
     e.reminder = Number.isFinite(rem) && rem >= 0 ? rem : null;
     e.desc = String(ev.desc || '').slice(0, 2000);
@@ -1552,12 +1568,14 @@
     },
   };
 
-  function precomputeAllHolidays(WORLD_HOLIDAYS_DATA) {
+  function precomputeAllHolidays(WORLD_HOLIDAYS_DATA, yearFrom, yearTo) {
     const allCountryHolidays = {};
     const thisYear = new Date().getFullYear();
+    const from = yearFrom == null ? thisYear - 1 : yearFrom;
+    const to = yearTo == null ? thisYear + 2 : yearTo;
     for (const [code, data] of Object.entries(WORLD_HOLIDAYS_DATA)) {
       allCountryHolidays[code] = {};
-      for (let y = thisYear - 1; y <= thisYear + 2; y++) {
+      for (let y = from; y <= to; y++) {
         for (const [mmdd, name] of Object.entries(data.fixed || {})) {
           allCountryHolidays[code][`${y}-${mmdd}`] = name;
         }
@@ -1573,24 +1591,26 @@
     return allCountryHolidays;
   }
 
-  function precomputeImportantDates(IMPORTANT_DATES_META) {
+  function precomputeImportantDates(IMPORTANT_DATES_META, yearFrom, yearTo) {
     const importantDatesData = {};
     const thisYear = new Date().getFullYear();
+    const from = yearFrom == null ? thisYear - 1 : yearFrom;
+    const to = yearTo == null ? thisYear + 2 : yearTo;
     for (const [id, meta] of Object.entries(IMPORTANT_DATES_META)) {
       importantDatesData[id] = {};
       if (meta.fixed) {
-        for (let y = thisYear - 1; y <= thisYear + 2; y++) {
+        for (let y = from; y <= to; y++) {
           importantDatesData[id][`${y}-${meta.fixed}`] = meta.name;
         }
       }
       if (meta.computed === 'us_mothers') {
-        for (let y = thisYear - 1; y <= thisYear + 2; y++) {
+        for (let y = from; y <= to; y++) {
           const day = nthWeekdayOfMonth(y, 4, 0, 2);
           if (day) importantDatesData[id][dateKey(y, 4, day)] = meta.name;
         }
       }
       if (meta.computed === 'us_fathers') {
-        for (let y = thisYear - 1; y <= thisYear + 2; y++) {
+        for (let y = from; y <= to; y++) {
           const day = nthWeekdayOfMonth(y, 5, 0, 3);
           if (day) importantDatesData[id][dateKey(y, 5, day)] = meta.name;
         }
@@ -1599,14 +1619,38 @@
     return importantDatesData;
   }
 
+  /* Grow the holiday tables when the user navigates outside the cached band. */
+  function ensureHolidayCoverage(state) {
+    const y = state.currentDate.getFullYear();
+    const needFrom = y - 1;
+    const needTo = y + 2;
+    if (
+      state.holidayCoverFrom != null &&
+      state.holidayCoverTo != null &&
+      needFrom >= state.holidayCoverFrom &&
+      needTo <= state.holidayCoverTo
+    ) {
+      return;
+    }
+    const from =
+      state.holidayCoverFrom == null ? needFrom : Math.min(state.holidayCoverFrom, needFrom);
+    const to = state.holidayCoverTo == null ? needTo : Math.max(state.holidayCoverTo, needTo);
+    state.allCountryHolidays = precomputeAllHolidays(WORLD_HOLIDAYS_DATA, from, to);
+    state.importantDatesData = precomputeImportantDates(IMPORTANT_DATES_META, from, to);
+    state.holidayCoverFrom = from;
+    state.holidayCoverTo = to;
+  }
+
   function isRecurringOnDate(startDate, targetDate, recurrence) {
     if (targetDate <= startDate) return false;
     if (recurrence.endDate) {
       const endDate = parseDateKey(recurrence.endDate);
       if (targetDate > endDate) return false;
     }
-    const diffMs = targetDate.getTime() - startDate.getTime();
-    const dayDiff = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    const dayDiff = dayOffset(
+      dateKey(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()),
+      dateKey(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()),
+    );
     const interval = recurrence.interval || 1;
 
     switch (recurrence.frequency) {
@@ -1726,7 +1770,11 @@
   /* Theme lives in src/shell.js (system / light / dark). Import maps the old
      bw value to dark so backups from before the template alignment still work. */
   function currentThemeMode() {
-    if (window.SeclusaTheme && typeof window.SeclusaTheme.current === 'function') {
+    if (
+      typeof window !== 'undefined' &&
+      window.SeclusaTheme &&
+      typeof window.SeclusaTheme.current === 'function'
+    ) {
       return window.SeclusaTheme.current();
     }
     return 'system';
@@ -1736,7 +1784,11 @@
     let mode = String(raw || '');
     if (mode === 'bw') mode = 'dark';
     if (mode !== 'light' && mode !== 'dark' && mode !== 'system') return;
-    if (window.SeclusaTheme && typeof window.SeclusaTheme.set === 'function') {
+    if (
+      typeof window !== 'undefined' &&
+      window.SeclusaTheme &&
+      typeof window.SeclusaTheme.set === 'function'
+    ) {
       window.SeclusaTheme.set(mode);
     }
   }
@@ -1775,10 +1827,32 @@
     return formatTime(t);
   }
 
+  function loadNotified(state) {
+    try {
+      const raw = safeGet(NOTIFIED_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        state.notifiedEvents = parsed;
+      }
+    } catch {
+      /* keep empty */
+    }
+  }
+
+  function saveNotified(state) {
+    const ids = Object.keys(state.notifiedEvents);
+    if (ids.length > 500) {
+      for (const id of ids.slice(0, ids.length - 500)) delete state.notifiedEvents[id];
+    }
+    safeSet(NOTIFIED_STORAGE_KEY, JSON.stringify(state.notifiedEvents));
+  }
+
   function checkReminders(state) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const now = new Date();
     const nowKey = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
+    let dirty = false;
     const tryNotify = (key, ev) => {
       if (ev.holiday || ev.important || !ev.time || ev.reminder == null) return;
       const [h, m] = ev.time.split(':').map(Number);
@@ -1789,6 +1863,7 @@
       const nid = key + '_' + ev.id + '_' + ev.reminder;
       if (state.notifiedEvents[nid]) return;
       state.notifiedEvents[nid] = true;
+      dirty = true;
       const when =
         ev.reminder === 0
           ? 'now'
@@ -1800,14 +1875,15 @@
       } catch {
         /* notifications may fail on some platforms */
       }
-      const ids = Object.keys(state.notifiedEvents);
-      if (ids.length > 500) delete state.notifiedEvents[ids[0]];
     };
     for (const [key, evs] of Object.entries(state.events)) {
       if (key < nowKey) continue;
       for (const ev of evs) tryNotify(key, ev);
     }
     for (const ev of getRecurringEventsForKey(state, nowKey)) tryNotify(nowKey, ev);
+    /* Multi-day timed events: remind on each day they span, at the event time. */
+    for (const ev of getSpanningEventsForKey(state, nowKey)) tryNotify(nowKey, ev);
+    if (dirty) saveNotified(state);
   }
 
   function downloadBlob(content, type, filename) {
@@ -1863,6 +1939,27 @@
       if (ch === 'n' || ch === 'N') return '\n';
       return ch;
     });
+  }
+
+  /* Timed ICS instants: Z → local calendar day/time; otherwise wall-clock as written
+     (floating local, or TZID without a full VTIMEZONE table). */
+  function parseIcsDateTime(dtstart) {
+    const mm = String(dtstart || '').match(/(\d{4})(\d{2})(\d{2})[T](\d{2})(\d{2})(\d{2})?/);
+    if (!mm) return null;
+    const isUtc = /Z\s*$/i.test(String(dtstart).trim());
+    if (isUtc) {
+      const utc = new Date(
+        Date.UTC(+mm[1], +mm[2] - 1, +mm[3], +mm[4], +mm[5], +(mm[6] || 0)),
+      );
+      return {
+        key: dateKey(utc.getFullYear(), utc.getMonth(), utc.getDate()),
+        time: `${String(utc.getHours()).padStart(2, '0')}:${String(utc.getMinutes()).padStart(2, '0')}`,
+      };
+    }
+    return {
+      key: `${mm[1]}-${mm[2]}-${mm[3]}`,
+      time: `${mm[4]}:${mm[5]}`,
+    };
   }
 
   function icsExportContent(state) {
@@ -1950,11 +2047,12 @@
     return saveExportFile('ics', icsExportContent(state), defaultExportName('ics'), 'text/calendar');
   }
 
-  function importIcs(state, onDone, text) {
+  function importIcs(state, onDone, text, opts) {
     if (typeof text !== 'string' || text.length > 5 * 1024 * 1024) {
       alert('File too large (max 5 MB)');
       return;
     }
+    const merge = !!(opts && opts.merge);
     const MAX_ICS_EVENTS = 10000;
     const unfolded = [];
     for (const l of text.split(/\r?\n/)) {
@@ -1983,6 +2081,8 @@
       cur[name] = (prior + val).slice(0, 10000);
     }
 
+    if (!merge) state.events = {};
+
     let count = 0;
     for (const v of items) {
       if (count >= MAX_ICS_EVENTS) break;
@@ -1997,10 +2097,10 @@
         if (!mm) continue;
         key = `${mm[1]}-${mm[2]}-${mm[3]}`;
       } else {
-        const mm = dtstart.match(/(\d{4})(\d{2})(\d{2})[T](\d{2})(\d{2})/);
-        if (!mm) continue;
-        key = `${mm[1]}-${mm[2]}-${mm[3]}`;
-        time = `${mm[4]}:${mm[5]}`;
+        const parsed = parseIcsDateTime(dtstart);
+        if (!parsed) continue;
+        key = parsed.key;
+        time = parsed.time;
       }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue;
 
@@ -2017,8 +2117,11 @@
             endDate = dateKey(e.getFullYear(), e.getMonth(), e.getDate());
           }
         } else {
-          const em = dend.match(/[T](\d{2})(\d{2})/);
-          if (em) endTime = `${em[1]}:${em[2]}`;
+          const endParsed = parseIcsDateTime(dend);
+          if (endParsed) {
+            endTime = endParsed.time;
+            if (endParsed.key > key) endDate = endParsed.key;
+          }
         }
       }
 
@@ -2086,12 +2189,20 @@
         }
       }
     } else {
+      /* Replace wipes events, countdowns and settings, then applies the file. */
       state.events = {};
       for (const [key, evs] of Object.entries(data.events)) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !Array.isArray(evs)) continue;
         state.events[key] = evs.map(sanitizeEvent).filter(Boolean);
         if (!state.events[key].length) delete state.events[key];
       }
+      state.countdowns = [];
+      state.selectedCountries = DEFAULT_COUNTRIES.slice();
+      state.enabledImportantDates = DEFAULT_IMPORTANT_DATES.slice();
+      state.weekStart = 0;
+      state.lang = 'en';
+      applyAppName(state, '');
+      applyImportedTheme('system');
     }
     if (data.settings && Array.isArray(data.settings.countries)) {
       state.selectedCountries = data.settings.countries.filter((c) => COUNTRY_META[c]);
@@ -2106,8 +2217,8 @@
       if (data.settings.lang && LANGS[data.settings.lang]) state.lang = data.settings.lang;
       if (typeof data.settings.theme === 'string') applyImportedTheme(data.settings.theme);
       if (typeof data.settings.appName === 'string') applyAppName(state, data.settings.appName);
-      saveSettings(state);
     }
+    if (!merge || data.settings) saveSettings(state);
     if (Array.isArray(data.countdowns)) {
       const imported = data.countdowns
         .filter((x) => x && typeof x === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || '')))
@@ -2128,8 +2239,8 @@
       } else {
         state.countdowns = imported.slice(0, 50);
       }
-      saveCountdowns(state);
     }
+    saveCountdowns(state);
     saveEvents(state);
     saveHolidayPreference(state);
     if (typeof document !== 'undefined') {
@@ -2151,7 +2262,12 @@
       const name = (file.name || '').toLowerCase();
       if (name.endsWith('.ics')) {
         try {
-          importIcs(state, onDone, String(e.target.result));
+          const choice = await chooseMerge(
+            'Import iCalendar',
+            'Merge adds these events to your calendar. Replace removes the events you have now first (countdowns and settings stay). Cancel leaves your calendar as it is.',
+          );
+          if (!choice) return;
+          importIcs(state, onDone, String(e.target.result), { merge: choice === 'merge' });
         } catch {
           alert('Failed to parse iCalendar file');
         }
@@ -2159,8 +2275,10 @@
       }
       try {
         const data = JSON.parse(e.target.result);
-        const choice = await chooseMerge('Import calendar',
-          'Merge adds these events to your calendar. Replace removes the events you have now first. Cancel leaves your calendar as it is.');
+        const choice = await chooseMerge(
+          'Import calendar',
+          'Merge adds these events to your calendar. Replace removes your events, countdowns and settings first, then loads the file. Cancel leaves your calendar as it is.',
+        );
         if (!choice) return;
         applyCalendarImport(state, data, { merge: choice === 'merge' });
         onDone();
@@ -2254,6 +2372,7 @@
   }
 
   function renderCalendar(state) {
+    ensureHolidayCoverage(state);
     const helpers = makeHelpers(state);
     const currentMonthEl = document.getElementById('current-month');
     currentMonthEl.textContent = viewTitle(state);
@@ -2261,6 +2380,21 @@
     if (state.currentView === 'week') return renderWeekView(state, helpers);
     if (state.currentView === 'year') return renderYearView(state, helpers);
     renderMonthView(state, helpers);
+  }
+
+  /* Next occurrence on or after fromKey (including the series start if still ahead). */
+  function nextRecurringKey(startKey, recurrence, fromKey) {
+    if (!recurrence) return startKey;
+    if (startKey >= fromKey) return startKey;
+    const start = parseDateKey(startKey);
+    if (isRecurringOnDate(start, parseDateKey(fromKey), recurrence)) return fromKey;
+    let key = fromKey;
+    const limit = addDaysKey(fromKey, 366 * 3);
+    while (key < limit) {
+      key = addDaysKey(key, 1);
+      if (isRecurringOnDate(start, parseDateKey(key), recurrence)) return key;
+    }
+    return startKey;
   }
 
   function updateViewButtons(state) {
@@ -3196,6 +3330,7 @@
     SETTINGS_KEY,
     APP_NAME_KEY,
     COUNTDOWN_STORAGE_KEY,
+    NOTIFIED_STORAGE_KEY,
     STORAGE_KEY + '_unreadable',
     'ambr3_calendar_accent',
     'privacy_calendar_theme',
@@ -3261,10 +3396,15 @@
       return;
     }
     const matches = [];
+    const todayKey = getTodayKey();
     for (const [key, evs] of Object.entries(state.events)) {
       for (const ev of evs) {
         if ((ev.title || '').toLowerCase().includes(needle) || (ev.desc || '').toLowerCase().includes(needle)) {
-          matches.push({ key, ev });
+          if (ev.recurrence && ev.recurrence.frequency) {
+            matches.push({ key: nextRecurringKey(key, ev.recurrence, todayKey), ev });
+          } else {
+            matches.push({ key, ev });
+          }
         }
       }
     }
@@ -3765,13 +3905,13 @@
 
   function init() {
     const state = createInitialState();
-    state.allCountryHolidays = precomputeAllHolidays(WORLD_HOLIDAYS_DATA);
-    state.importantDatesData = precomputeImportantDates(IMPORTANT_DATES_META);
+    ensureHolidayCoverage(state);
 
     loadAppName(state);
     loadSettings(state, LANGS);
     loadEvents(state);
     loadCountdowns(state);
+    loadNotified(state);
     loadHolidayPreference(state, COUNTRY_META, IMPORTANT_DATES_META);
     buildJumpOptions(state, makeHelpers(state));
     populateSettings(state);
@@ -3812,7 +3952,12 @@
       formatTime,
       formatTimeRange,
       isRecurringOnDate,
+      nextRecurringKey,
       sanitizeEvent,
+      createInitialState,
+      applyCalendarImport,
+      parseIcsDateTime,
+      getSpanningEventsForKey,
       precomputeAllHolidays,
       precomputeImportantDates,
       WORLD_HOLIDAYS_DATA,
@@ -3828,6 +3973,8 @@
       nextAnnualDate,
       resolvePresetNextDate,
       daysToGoLabel,
+      DEFAULT_COUNTRIES,
+      DEFAULT_IMPORTANT_DATES,
     });
   }
 })();
