@@ -7,11 +7,11 @@
    Only the shell is cached: no request or response body carrying event data
    ever passes through here. */
 const CACHE_PREFIX = "seclusa-calendar-shell-";
-const CACHE = CACHE_PREFIX + "v0.3.3";
+const CACHE = CACHE_PREFIX + "v0.3.4";
 const SHELL = ["./", "./index.html",
-  "./seclusa-base.css", "./seclusa-base.css?v=0.3.3",
-  "./app.css", "./app.css?v=0.3.3",
-  "./calendar/theme.css", "./calendar/theme.css?v=0.3.3",
+  "./seclusa-base.css", "./seclusa-base.css?v=0.3.4",
+  "./app.css", "./app.css?v=0.3.4",
+  "./calendar/theme.css", "./calendar/theme.css?v=0.3.4",
   "./src/theme-boot.js", "./src/shell.js", "./calendar/app.js",
   "./manifest.webmanifest", "./icon.svg",
   "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png",
@@ -25,8 +25,8 @@ const SHELL = ["./", "./index.html",
 /* Required for a usable offline launch. Optional icons and fonts may fail
    without aborting install. Every script and stylesheet is here: if one of
    them were missing from the cache, the app would load and then break. */
-const CRITICAL = ["./index.html", "./seclusa-base.css?v=0.3.3",
-  "./app.css?v=0.3.3", "./calendar/theme.css?v=0.3.3",
+const CRITICAL = ["./index.html", "./seclusa-base.css?v=0.3.4",
+  "./app.css?v=0.3.4", "./calendar/theme.css?v=0.3.4",
   "./src/theme-boot.js", "./src/shell.js", "./calendar/app.js"];
 
 const CACHEABLE = new Set(SHELL.map((u) => new URL(u, self.location.href).pathname));

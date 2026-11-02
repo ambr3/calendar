@@ -2,6 +2,11 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.4 — 2026-11-02
+
+### Changed
+- PWA icons use a black-and-white calendar mark (distinct from Notes).
+
 ## 0.3.3 — 2026-11-02
 
 ### Fixed
