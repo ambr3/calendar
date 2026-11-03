@@ -34,7 +34,8 @@
   color: var(--text);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
-  background: var(--bg);
+  /* Transparent so the orange lines sky on body::before shows through. */
+  background: transparent;
 
   /* Alias for older calendar rules that said --accent-color. The base theme
      owns --accent; there is no separate brand colour picker. */

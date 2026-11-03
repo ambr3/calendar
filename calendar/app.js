@@ -1886,16 +1886,104 @@
     if (dirty) saveNotified(state);
   }
 
-  function downloadBlob(content, type, filename) {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const LAST_BACKUP_KEY = 'seclusa-calendar-last-backup';
+
+  function showBackupToast(message) {
+    const el = document.getElementById('toast');
+    if (!el) {
+      alert(message);
+      return;
+    }
+    el.textContent = message;
+    el.classList.add('open');
+    clearTimeout(showBackupToast._t);
+    showBackupToast._t = setTimeout(() => el.classList.remove('open'), 2600);
+  }
+
+  function refreshBackupMeta() {
+    const label = document.getElementById('bu-last');
+    const nag = document.getElementById('bu-nag');
+    if (label && typeof lastBackupLabel === 'function') label.textContent = lastBackupLabel(LAST_BACKUP_KEY);
+    if (nag && typeof lastBackupNagText === 'function') {
+      const text = lastBackupNagText(LAST_BACKUP_KEY);
+      nag.textContent = text;
+      nag.hidden = !text;
+    }
+  }
+
+  function markBackupDone() {
+    if (typeof lastBackupMark === 'function') lastBackupMark(LAST_BACKUP_KEY);
+    refreshBackupMeta();
+  }
+
+  function promptBackupPassword(title, body, okLabel) {
+    return new Promise((resolve) => {
+      const dlg = document.getElementById('dlg-password');
+      if (!dlg) {
+        resolve(window.prompt(title + '\n\n' + body) || null);
+        return;
+      }
+      document.getElementById('pw-title').textContent = title;
+      document.getElementById('pw-text').textContent = body;
+      const input = document.getElementById('pw-input');
+      input.value = '';
+      document.getElementById('pw-ok').textContent = okLabel;
+      let settled = false;
+      const cleanup = () => {
+        dlg.removeEventListener('cancel', onCancel);
+        dlg.removeEventListener('close', onClose);
+        document.getElementById('pw-ok').onclick = null;
+        document.getElementById('pw-cancel').onclick = null;
+        input.onkeydown = null;
+      };
+      const done = (v) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (dlg.open) dlg.close();
+        resolve(v);
+      };
+      const onCancel = () => done(null);
+      const onClose = () => { if (!dlg.open) done(null); };
+      dlg.addEventListener('cancel', onCancel);
+      dlg.addEventListener('close', onClose);
+      document.getElementById('pw-ok').onclick = () => done(input.value);
+      document.getElementById('pw-cancel').onclick = () => done(null);
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          done(input.value);
+        }
+      };
+      if (dlg.open) dlg.close();
+      dlg.showModal();
+      setTimeout(() => input.focus(), 50);
+    });
+  }
+
+  async function promptNewBackupPassword() {
+    const first = await promptBackupPassword(
+      'Set a password',
+      'The export is encrypted with this password. There is no way to recover the calendar without it.',
+      'Encrypt and export',
+    );
+    if (!first) return null;
+    const second = await promptBackupPassword(
+      'Confirm password',
+      'The export is encrypted with this password. There is no way to recover the calendar without it.',
+      'Encrypt and export',
+    );
+    if (second === null) return null;
+    if (first !== second) {
+      showBackupToast('Passwords do not match');
+      return null;
+    }
+    const minLen = typeof MIN_PASSWORD_LENGTH === 'number' ? MIN_PASSWORD_LENGTH : 8;
+    if (first.length < minLen) {
+      showBackupToast('Use at least ' + minLen + ' characters.');
+      return null;
+    }
+    return first;
   }
 
   function jsonExportContent(state) {
@@ -1917,9 +2005,15 @@
   }
 
   function defaultExportName(kind) {
-    const date = new Date();
-    const stamp = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    return `seclusa-calendar-${stamp}.${kind === 'ics' ? 'ics' : 'json'}`;
+    const stamp = typeof backupDateStamp === 'function'
+      ? backupDateStamp()
+      : (() => {
+          const date = new Date();
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        })();
+    if (kind === 'ics') return `seclusa-calendar-${stamp}.ics`;
+    if (kind === 'enc') return `seclusa-calendar-${stamp}.enc.json`;
+    return `seclusa-calendar-${stamp}.json`;
   }
 
   function icsDateStr(d) {
@@ -2012,39 +2106,97 @@
     return lines.join('\r\n') + '\r\n';
   }
 
-  function fsApiSupported() {
-    return typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
+  /* Save picker or download. No folder handle is kept between exports. */
+  async function saveExportBlob(blob, suggestedName, types) {
+    if (typeof saveBlob === 'function') return saveBlob(blob, suggestedName, types);
+    if (typeof downloadBlob === 'function') {
+      downloadBlob(blob, suggestedName);
+      return 'download';
+    }
+    return null;
   }
 
-  function writeExportFile(handle, content) {
-    return handle.createWritable().then((writable) => writable.write(content).then(() => writable.close()));
-  }
-
-  /* Always through the save picker or a download. No handle is kept between
-     exports, so the app never holds write access to a folder it was given once. */
-  async function saveExportFile(kind, content, suggestedName, mime) {
-    if (fsApiSupported()) {
-      const ext = kind === 'ics' ? '.ics' : '.json';
-      const types = [{ description: kind === 'ics' ? 'iCalendar' : 'Seclusa backup', accept: { [mime]: [ext] } }];
+  async function prepareJsonPayload(state, encrypted) {
+    let text = jsonExportContent(state);
+    let name = defaultExportName('json');
+    let type = 'application/json';
+    if (encrypted) {
+      if (!cryptoBox || !cryptoBox.supported) {
+        showBackupToast('Encryption is unavailable in this browser.');
+        return null;
+      }
+      const password = await promptNewBackupPassword();
+      if (!password) return null;
       try {
-        const handle = await window.showSaveFilePicker({ suggestedName, types, id: 'seclusa-export' });
-        await writeExportFile(handle, content);
-        return true;
+        showBackupToast('Encrypting…');
+        const box = await cryptoBox.encrypt(text, password);
+        text = JSON.stringify(box, null, 2);
+        name = defaultExportName('enc');
+        type = 'application/octet-stream';
       } catch (err) {
-        if (!(err && err.name === 'AbortError')) downloadBlob(content, mime, suggestedName);
-        return true;
+        showBackupToast(err && err.message ? err.message : 'Backup failed.');
+        return null;
       }
     }
-    downloadBlob(content, mime, suggestedName);
-    return true;
+    return { text, name, type, encrypted: !!encrypted };
   }
 
-  function exportJson(state) {
-    return saveExportFile('json', jsonExportContent(state), defaultExportName('json'), 'application/json');
+  async function shareJson(state, encrypted) {
+    const prepared = await prepareJsonPayload(state, encrypted);
+    if (!prepared) return;
+    const file = new File([prepared.text], prepared.name, { type: prepared.type });
+    const result = typeof shareFile === 'function' ? await shareFile(file) : 'unavailable';
+    if (result === 'shared') {
+      markBackupDone();
+      showBackupToast(prepared.encrypted ? 'Encrypted backup shared.' : 'Backup shared.');
+      return;
+    }
+    if (result === 'abort') return;
+    showBackupToast('Sharing isn’t available here. Use Save / Download instead.');
   }
 
-  function exportIcs(state) {
-    return saveExportFile('ics', icsExportContent(state), defaultExportName('ics'), 'text/calendar');
+  async function exportJson(state, encrypted) {
+    const prepared = await prepareJsonPayload(state, !!encrypted);
+    if (!prepared) return;
+    const blob = new Blob([prepared.text], { type: 'application/json' });
+    const how = await saveExportBlob(blob, prepared.name, [{
+      description: 'Seclusa backup',
+      accept: { 'application/json': ['.json'] },
+    }]);
+    if (how === null) return;
+    markBackupDone();
+    if (how === 'picker') {
+      showBackupToast(prepared.encrypted ? 'Encrypted backup saved.' : 'Backup saved.');
+    } else {
+      showBackupToast(prepared.encrypted ? 'Encrypted backup downloaded.' : 'Backup downloaded.');
+    }
+  }
+
+  async function shareIcs(state) {
+    const text = icsExportContent(state);
+    const name = defaultExportName('ics');
+    const file = new File([text], name, { type: 'text/calendar' });
+    const result = typeof shareFile === 'function' ? await shareFile(file) : 'unavailable';
+    if (result === 'shared') {
+      markBackupDone();
+      showBackupToast('iCalendar shared.');
+      return;
+    }
+    if (result === 'abort') return;
+    showBackupToast('Sharing isn’t available here. Use Save / Download instead.');
+  }
+
+  async function exportIcs(state) {
+    const text = icsExportContent(state);
+    const name = defaultExportName('ics');
+    const blob = new Blob([text], { type: 'text/calendar' });
+    const how = await saveExportBlob(blob, name, [{
+      description: 'iCalendar',
+      accept: { 'text/calendar': ['.ics'] },
+    }]);
+    if (how === null) return;
+    markBackupDone();
+    showBackupToast(how === 'picker' ? 'iCalendar saved.' : 'iCalendar downloaded.');
   }
 
   function importIcs(state, onDone, text, opts) {
@@ -2274,7 +2426,21 @@
         return;
       }
       try {
-        const data = JSON.parse(e.target.result);
+        let data = JSON.parse(e.target.result);
+        if (typeof isEncryptedContainer === 'function' && isEncryptedContainer(data)) {
+          const password = await promptBackupPassword(
+            'Password required',
+            'This file is encrypted. Enter the password it was exported with.',
+            'Decrypt and import',
+          );
+          if (password === null) return;
+          try {
+            data = JSON.parse(await cryptoBox.decrypt(data, password));
+          } catch (err) {
+            alert(err && err.message ? err.message : 'Wrong password, or the file is damaged.');
+            return;
+          }
+        }
         const choice = await chooseMerge(
           'Import calendar',
           'Merge adds these events to your calendar. Replace removes your events, countdowns and settings first, then loads the file. Cancel leaves your calendar as it is.',
@@ -2282,7 +2448,7 @@
         if (!choice) return;
         applyCalendarImport(state, data, { merge: choice === 'merge' });
         onDone();
-        alert('Events imported successfully');
+        showBackupToast('Events imported successfully');
       } catch (err) {
         alert(err && err.message ? err.message : 'Failed to parse calendar file');
       }
@@ -3799,20 +3965,47 @@
     const clearAllBtn = document.getElementById('clear-all-data-btn');
     if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllData);
 
+    refreshBackupMeta();
+    const encOk = !!(typeof cryptoBox !== 'undefined' && cryptoBox && cryptoBox.supported);
+    const shareJsonBtn = document.getElementById('bu-share-json');
     const exportJsonBtn = document.getElementById('bu-export-json');
-    if (exportJsonBtn) {
-      exportJsonBtn.addEventListener('click', () => {
-        exportJson(state).then(() => {
-          if (typeof closeSheet === 'function') closeSheet();
-        });
+    const shareJsonEncBtn = document.getElementById('bu-share-json-enc');
+    const exportJsonEncBtn = document.getElementById('bu-export-json-enc');
+    const shareIcsBtn = document.getElementById('bu-share-ics');
+    const exportIcsBtn = document.getElementById('bu-export-ics');
+    const afterExport = () => {
+      if (typeof closeSheet === 'function') closeSheet();
+    };
+    if (shareJsonBtn) {
+      shareJsonBtn.addEventListener('click', () => {
+        shareJson(state, false).then(afterExport).catch(() => showBackupToast('Backup failed.'));
       });
     }
-    const exportIcsBtn = document.getElementById('bu-export-ics');
+    if (exportJsonBtn) {
+      exportJsonBtn.addEventListener('click', () => {
+        exportJson(state, false).then(afterExport).catch(() => showBackupToast('Backup failed.'));
+      });
+    }
+    if (shareJsonEncBtn) {
+      shareJsonEncBtn.hidden = !encOk;
+      shareJsonEncBtn.addEventListener('click', () => {
+        shareJson(state, true).then(afterExport).catch(() => showBackupToast('Backup failed.'));
+      });
+    }
+    if (exportJsonEncBtn) {
+      exportJsonEncBtn.hidden = !encOk;
+      exportJsonEncBtn.addEventListener('click', () => {
+        exportJson(state, true).then(afterExport).catch(() => showBackupToast('Backup failed.'));
+      });
+    }
+    if (shareIcsBtn) {
+      shareIcsBtn.addEventListener('click', () => {
+        shareIcs(state).then(afterExport).catch(() => showBackupToast('Backup failed.'));
+      });
+    }
     if (exportIcsBtn) {
       exportIcsBtn.addEventListener('click', () => {
-        exportIcs(state).then(() => {
-          if (typeof closeSheet === 'function') closeSheet();
-        });
+        exportIcs(state).then(afterExport).catch(() => showBackupToast('Backup failed.'));
       });
     }
     const importBtn = document.getElementById('bu-import');
@@ -3830,6 +4023,7 @@
         }, file);
       });
     }
+    window.refreshCalendarBackupMeta = refreshBackupMeta;
 
     document.addEventListener('click', (e) => {
       const pop = document.getElementById('jump-pop');

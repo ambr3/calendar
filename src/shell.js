@@ -53,8 +53,6 @@ function closeSheet() {
 (function () {
   const THEME_KEY = "ssc.pref_key_night_mode";
   const LEGACY_KEY = "privacy_calendar_theme";
-  const ORDER = ["system", "light", "dark"];
-  const LABELS = { system: "System", light: "Light", dark: "Dark" };
   const LIGHT = "#ffffff";
   const DARK = "#0a0a0a";
 
@@ -121,13 +119,12 @@ function closeSheet() {
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
       m.setAttribute("content", colour);
     });
-    const next = ORDER[(ORDER.indexOf(mode) + 1) % ORDER.length];
     const label = document.getElementById("theme-toggle-label");
-    if (label) label.textContent = LABELS[next];
+    if (label) label.textContent = "Theme";
     const btn = document.getElementById("theme-toggle");
     if (btn) {
       btn.setAttribute("aria-pressed", mode === "system" ? "false" : "true");
-      btn.title = "Switch to " + LABELS[next].toLowerCase() + " theme";
+      btn.title = "Theme settings";
     }
   }
 
@@ -147,15 +144,6 @@ function closeSheet() {
     legacyKey: LEGACY_KEY,
   };
 
-  const themeBtn = document.getElementById("theme-toggle");
-  if (themeBtn) {
-    themeBtn.addEventListener("click", () => {
-      const current = readMode();
-      const next = ORDER[(ORDER.indexOf(current) + 1) % ORDER.length];
-      setMode(next);
-    });
-  }
-
   if (window.matchMedia) {
     const query = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => {
@@ -170,12 +158,25 @@ function closeSheet() {
   const backupBtn = $("nav-backup");
   if (scrim) scrim.addEventListener("click", closeSheet);
   if (aboutBtn) aboutBtn.addEventListener("click", () => showSheet("sheet-about"));
-  if (backupBtn) backupBtn.addEventListener("click", () => showSheet("sheet-backup"));
+  if (backupBtn) {
+    backupBtn.addEventListener("click", () => {
+      if (typeof window.refreshCalendarBackupMeta === "function") window.refreshCalendarBackupMeta();
+      showSheet("sheet-backup");
+    });
+  }
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeSheet();
   });
 
   applyMode(readMode());
+
+  if (window.SeclusaThemeSheet) {
+    window.SeclusaThemeSheet.wire({
+      getMode: readMode,
+      setMode: setMode,
+      showSheet: showSheet,
+    });
+  }
 })();
 
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {

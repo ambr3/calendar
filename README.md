@@ -7,11 +7,11 @@ server sending anything anywhere.
 
 ## Features
 
-- Version 0.3.4
+- Version 0.3.8
 - Month, week and year views
 - Events with a time, colour, note, recurrence and an optional reminder
 - Holidays and countdowns, with birthdays as a separate list
-- Import and export as JSON or iCalendar (.ics)
+- Share or save backups as JSON (optional encryption) or iCalendar (.ics); 30-day reminder
 - Add it to your home screen and it opens on its own, no browser needed, and
   works with no internet connection
 - Everything is stored on your device. Clearing your browser data removes it

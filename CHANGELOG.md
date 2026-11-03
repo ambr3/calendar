@@ -2,6 +2,33 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.8 — 2026-11-03
+
+### Changed
+- Theme nav label is always **Theme**.
+- Orange ruled lines faded further.
+- About links point at the GitHub repo (`ambr3/calendar`) for source, README, and privacy policy.
+
+## 0.3.7 — 2026-11-03
+
+### Added
+- Theme sheet: System / Light / Dark plus background swatches (lines, named colours, custom hex).
+
+## 0.3.6 — 2026-11-03
+
+### Fixed
+- Orange ruled-lines theme shows full-page again (opaque body background was covering it).
+
+## 0.3.5 — 2026-11-03
+
+### Added
+- Separate Share and Save / Download for JSON and iCalendar.
+- Optional encrypted JSON backup (same AES-GCM container as Notes).
+- Last-backup label and a soft reminder after 30 days on the Backup sheet.
+
+### Changed
+- iCalendar stays plaintext (for other calendar apps); encrypt JSON for a secure stash.
+
 ## 0.3.4 — 2026-11-02
 
 ### Changed
