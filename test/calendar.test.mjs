@@ -10,7 +10,10 @@ import { dirname, join } from "node:path";
 import { runInNewContext } from "node:vm";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const context = { localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } } };
+const context = {
+  localStorage: { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } },
+  alert() {},
+};
 runInNewContext(readFileSync(join(here, "..", "calendar", "app.js"), "utf8"), context);
 const core = context.__SECLUSA_CORE__;
 
@@ -43,6 +46,27 @@ function eq(name, got, want) {
     core.dayOffset("2026-03-08", "2026-03-09"), 1);
   eq("timeToMinutes reads HH:MM", core.timeToMinutes("09:30"), 570);
   eq("timeToMinutes treats an empty time as midnight", core.timeToMinutes(""), 0);
+  eq("week pill runs an overnight start through midnight",
+    core.weekEventMinutes({ time: "22:00", endTime: "09:00", endDate: "2026-11-07" }, "2026-11-06"),
+    { minutes: 22 * 60, endMin: 1440 });
+  eq("week pill runs an overnight end from midnight",
+    core.weekEventMinutes(
+      { time: "22:00", endTime: "09:00", endDate: "2026-11-07", originalDate: "2026-11-06" },
+      "2026-11-07",
+    ),
+    { minutes: 0, endMin: 9 * 60 });
+  eq("week pill fills a middle day",
+    core.weekEventMinutes(
+      { time: "22:00", endTime: "09:00", endDate: "2026-11-08", originalDate: "2026-11-06" },
+      "2026-11-07",
+    ),
+    { minutes: 0, endMin: 1440 });
+  eq("week pill keeps a same-day range",
+    core.weekEventMinutes({ time: "09:00", endTime: "10:30" }, "2026-11-06"),
+    { minutes: 9 * 60, endMin: 10 * 60 + 30 });
+  eq("week pill fills an all-day event",
+    core.weekEventMinutes({ title: "Off" }, "2026-11-06"),
+    { minutes: 0, endMin: 1440 });
 }
 
 /* ------------------------------------------------------------- recurrence */
@@ -146,6 +170,50 @@ function eq(name, got, want) {
     core.sanitizeEvent({ title: "x", time: "10:00", endTime: "09:00" }).endTime, null);
   eq("sanitizeEvent keeps endTime on a multi-day span",
     core.sanitizeEvent({ title: "x", time: "10:00", endTime: "09:00", endDate: "2026-11-05" }).endTime, "09:00");
+  eq("sanitizeEvent keeps an explicit no-reminder as null",
+    core.sanitizeEvent({ title: "x", reminder: null }).reminder, null);
+  eq("sanitizeEvent keeps at-time reminder",
+    core.sanitizeEvent({ title: "x", reminder: 0 }).reminder, 0);
+  eq("sanitizeEvent drops a reminder outside the choices",
+    core.sanitizeEvent({ title: "x", reminder: 15 }).reminder, null);
+  eq("sanitizeEvent caps a huge repeat interval",
+    core.sanitizeEvent({ title: "x", recurrence: { frequency: "daily", interval: 100000 } }).recurrence.interval, 99);
+  eq("safeCssColor rejects a non-hex colour", core.safeCssColor("red;color:blue"), "#6cb5e6");
+  eq("safeCssColor keeps a hex colour", core.safeCssColor("#10b981"), "#10b981");
+}
+
+/* ------------------------------------------------- reminder occurrences */
+{
+  const weekly = { frequency: "weekly", interval: 1 };
+  eq("1-day reminder sees the next occurrence when today is not it",
+    core.reminderOccurrenceKeys("2026-11-02", weekly, "2026-11-08", 1440),
+    ["2026-11-09"]);
+  eq("a future start inside the horizon is included",
+    core.reminderOccurrenceKeys("2026-11-09", weekly, "2026-11-08", 1440),
+    ["2026-11-09"]);
+}
+
+/* ---------------------------------------------------------- ics replace */
+{
+  const state = core.createInitialState();
+  state.events = { "2026-01-01": [{ id: "keep", title: "Keep", time: "09:00" }] };
+  core.importIcs(state, () => {}, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", { merge: false });
+  eq("empty ics replace leaves existing events", Object.keys(state.events), ["2026-01-01"]);
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "BEGIN:VEVENT",
+    "UID:dentist@example",
+    "DTSTART:20261106T090000",
+    "SUMMARY;LANGUAGE=en:Dentist",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  const imported = core.createInitialState();
+  core.importIcs(imported, () => {}, ics, { merge: false });
+  const day = imported.events["2026-11-06"] || [];
+  check("ics import reads SUMMARY with parameters", day.length === 1 && day[0].title === "Dentist",
+    JSON.stringify(day));
 }
 
 /* ----------------------------------------------------------- ICS datetime */

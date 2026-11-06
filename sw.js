@@ -7,11 +7,11 @@
    Only the shell is cached: no request or response body carrying event data
    ever passes through here. */
 const CACHE_PREFIX = "seclusa-calendar-shell-";
-const CACHE = CACHE_PREFIX + "v0.3.8";
+const CACHE = CACHE_PREFIX + "v0.3.9";
 const SHELL = ["./", "./index.html",
-  "./seclusa-base.css", "./seclusa-base.css?v=0.3.8",
-  "./app.css", "./app.css?v=0.3.8",
-  "./calendar/theme.css", "./calendar/theme.css?v=0.3.8",
+  "./seclusa-base.css", "./seclusa-base.css?v=0.3.9",
+  "./app.css", "./app.css?v=0.3.9",
+  "./calendar/theme.css", "./calendar/theme.css?v=0.3.9",
   "./src/theme-boot.js", "./src/seclusa-backup.js", "./src/theme-sheet.js", "./src/shell.js", "./calendar/app.js",
   "./manifest.webmanifest", "./icon.svg",
   "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png",
@@ -25,8 +25,8 @@ const SHELL = ["./", "./index.html",
 /* Required for a usable offline launch. Optional icons and fonts may fail
    without aborting install. Every script and stylesheet is here: if one of
    them were missing from the cache, the app would load and then break. */
-const CRITICAL = ["./index.html", "./seclusa-base.css?v=0.3.8",
-  "./app.css?v=0.3.8", "./calendar/theme.css?v=0.3.8",
+const CRITICAL = ["./index.html", "./seclusa-base.css?v=0.3.9",
+  "./app.css?v=0.3.9", "./calendar/theme.css?v=0.3.9",
   "./src/theme-boot.js", "./src/seclusa-backup.js", "./src/theme-sheet.js", "./src/shell.js", "./calendar/app.js"];
 
 const CACHEABLE = new Set(SHELL.map((u) => new URL(u, self.location.href).pathname));
@@ -44,6 +44,12 @@ function ownCache() {
 
 function ownMatch(request) {
   return ownCache().then((c) => c.match(request));
+}
+
+function isShellNavigation(url) {
+  const scopePath = new URL("./", self.location.href).pathname;
+  const indexPath = new URL("./index.html", self.location.href).pathname;
+  return url.pathname === scopePath || url.pathname === indexPath;
 }
 
 self.addEventListener("install", (event) => {
@@ -85,13 +91,19 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          if (res.ok && res.type === "basic") {
+          /* Only the app document may replace the cached shell. Another
+             same-origin page (for example tools/icon-preview.html) must not
+             be stored under index.html. */
+          if (res.ok && res.type === "basic" && isShellNavigation(url)) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put("./index.html", copy)).catch(() => {});
           }
           return res;
         })
-        .catch(() => ownMatch("./index.html").then((r) => r || offlineResponse()))
+        .catch(() => {
+          if (!isShellNavigation(url)) return offlineResponse();
+          return ownMatch("./index.html").then((r) => r || offlineResponse());
+        })
     );
     return;
   }

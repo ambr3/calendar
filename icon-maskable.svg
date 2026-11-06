@@ -1,19 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Seclusa Calendar">
   <rect width="1024" height="1024" rx="0" fill="#ffffff"/>
-  <rect x="184" y="164" width="656" height="700" rx="72" fill="none" stroke="#0a0a0a" stroke-width="28"/>
-  <circle cx="368" cy="164" r="28" fill="#0a0a0a"/>
-  <circle cx="656" cy="164" r="28" fill="#0a0a0a"/>
-  <rect x="212" y="250" width="600" height="48" fill="#0a0a0a"/>
-  <rect x="164" y="368" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="344" y="368" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="524" y="368" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="704" y="368" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="164" y="554" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="344" y="554" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="524" y="554" width="154" height="160" rx="12" fill="#0a0a0a"/>
-  <rect x="704" y="554" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="164" y="740" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="344" y="740" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="524" y="740" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
-  <rect x="704" y="740" width="154" height="160" rx="12" fill="none" stroke="#0a0a0a" stroke-width="10"/>
+  <circle cx="392" cy="210" r="42" fill="#0a0a0a"/>
+  <circle cx="632" cy="210" r="42" fill="#0a0a0a"/>
+  <rect x="196" y="230" width="632" height="620" rx="72" fill="#0a0a0a"/>
+  <rect x="248" y="308" width="528" height="64" rx="12" fill="#ffffff"/>
+  <rect x="263" y="408" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="393" y="408" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="523" y="408" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="653" y="408" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="263" y="538" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="393" y="538" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="653" y="538" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="263" y="668" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="393" y="668" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="523" y="668" width="108" height="108" rx="16" fill="#ffffff"/>
+  <rect x="653" y="668" width="108" height="108" rx="16" fill="#ffffff"/>
 </svg>

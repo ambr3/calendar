@@ -2,6 +2,18 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.9 — 2026-11-06
+
+### Changed
+- PWA icon is a solid black calendar on white, matching the Notes mark.
+- Week view draws overnight and all-day events across the hours they cover.
+
+### Fixed
+- A reminder set to None no longer fires at the event time after reload.
+- Repeating events honour a one-day reminder.
+- Replacing from an empty iCalendar file no longer drops the events already stored.
+- The service worker only caches the calendar page as the offline shell.
+
 ## 0.3.8 — 2026-11-03
 
 ### Changed

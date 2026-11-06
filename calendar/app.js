@@ -73,6 +73,26 @@
     return (h || 0) * 60 + (m || 0);
   }
 
+  /* Week column span. A later end date fills through midnight, and the last
+     day starts at midnight. An all-day event fills the column. */
+  function weekEventMinutes(ev, key) {
+    const startKey = (ev && ev.originalDate) || key;
+    const hasTime = !!(ev && ev.time);
+    let minutes = hasTime ? timeToMinutes(ev.time) : 0;
+    let endMin;
+    if (!hasTime && !(ev && ev.endTime)) endMin = 1440;
+    else if (ev && ev.endTime) endMin = timeToMinutes(ev.endTime);
+    else endMin = Math.min(minutes + 60, 1440);
+    if (ev && ev.endDate && ev.endDate > startKey) {
+      if (key > startKey) minutes = 0;
+      if (key < ev.endDate) endMin = 1440;
+      else if (ev.endTime) endMin = timeToMinutes(ev.endTime);
+      else endMin = 1440;
+    }
+    if (endMin <= minutes) endMin = Math.min(minutes + 60, 1440);
+    return { minutes, endMin };
+  }
+
   const LANGS = {
     en: {
       months: [
@@ -268,6 +288,7 @@
   const HOLIDAY_COLOR = '#dc2626';
   const IMPORTANT_COLOR = '#f97316';
   const STORAGE_MAX_BYTES = 4 * 1024 * 1024;
+  const REMINDER_MINUTES = [0, 10, 30, 60, 1440];
   const DEFAULT_COUNTRIES = ['uk'];
   const DEFAULT_IMPORTANT_DATES = ['valentines', 'halloween', 'mothers_day', 'fathers_day', 'new_years_eve'];
 
@@ -307,8 +328,14 @@
     if (e.time && e.endTime && !e.endDate && timeToMinutes(e.endTime) <= timeToMinutes(e.time)) {
       e.endTime = null;
     }
-    const rem = typeof ev.reminder === 'number' ? ev.reminder : Number(ev.reminder);
-    e.reminder = Number.isFinite(rem) && rem >= 0 ? rem : null;
+    /* null and "" are "no reminder". Number(null) is 0, which is a real choice
+       ("at time of event"), so only explicit numbers and numeric strings count. */
+    let reminder = null;
+    if (typeof ev.reminder === 'number' || (typeof ev.reminder === 'string' && ev.reminder !== '')) {
+      const rem = typeof ev.reminder === 'number' ? ev.reminder : Number(ev.reminder);
+      if (REMINDER_MINUTES.indexOf(rem) !== -1) reminder = rem;
+    }
+    e.reminder = reminder;
     e.desc = String(ev.desc || '').slice(0, 2000);
     e.color = /^#[0-9a-fA-F]{6}$/.test(ev.color || '') ? ev.color : '#6cb5e6';
     if (ev.recurrence && typeof ev.recurrence === 'object') {
@@ -316,7 +343,7 @@
       if (freq === 'daily' || freq === 'weekly' || freq === 'monthly' || freq === 'yearly') {
         e.recurrence = {
           frequency: freq,
-          interval: Math.max(1, parseInt(ev.recurrence.interval, 10) || 1),
+          interval: Math.min(99, Math.max(1, parseInt(ev.recurrence.interval, 10) || 1)),
           endDate: dateRe.test(ev.recurrence.endDate || '') ? ev.recurrence.endDate : null,
         };
       }
@@ -326,6 +353,10 @@
     if (ev.birthday) e.birthday = true;
     if (ev.country) e.country = String(ev.country).slice(0, 100);
     return e;
+  }
+
+  function safeCssColor(color) {
+    return /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#6cb5e6';
   }
 
   function loadEvents(state) {
@@ -1820,7 +1851,22 @@
     }
     syncReminderBtn();
     checkReminders(state);
-    setInterval(() => checkReminders(state), 30000);
+    let reminderTimer = null;
+    const stopReminderTimer = () => {
+      if (reminderTimer == null) return;
+      clearInterval(reminderTimer);
+      reminderTimer = null;
+    };
+    const startReminderTimer = () => {
+      if (reminderTimer != null) return;
+      reminderTimer = setInterval(() => checkReminders(state), 30000);
+    };
+    startReminderTimer();
+    window.addEventListener('pagehide', stopReminderTimer);
+    window.addEventListener('pageshow', () => {
+      checkReminders(state);
+      startReminderTimer();
+    });
   }
 
   function formatNotificationTime(t) {
@@ -1833,7 +1879,14 @@
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        state.notifiedEvents = parsed;
+        const keys = Object.keys(parsed);
+        const kept = {};
+        const start = Math.max(0, keys.length - 500);
+        for (let i = start; i < keys.length; i++) {
+          const k = keys[i];
+          if (typeof k === 'string' && k.length <= 300 && parsed[k]) kept[k] = true;
+        }
+        state.notifiedEvents = kept;
       }
     } catch {
       /* keep empty */
@@ -1880,10 +1933,35 @@
       if (key < nowKey) continue;
       for (const ev of evs) tryNotify(key, ev);
     }
-    for (const ev of getRecurringEventsForKey(state, nowKey)) tryNotify(nowKey, ev);
+    /* Recurring series live on their start date, which is often in the past.
+       "1 day before" has to see tomorrow's occurrence, not only today's. */
+    for (const [key, evs] of Object.entries(state.events)) {
+      for (const ev of evs) {
+        if (!ev.recurrence || ev.recurrence.frequency === 'none' || ev.reminder == null || !ev.time) continue;
+        const occurrences = reminderOccurrenceKeys(key, ev.recurrence, nowKey, ev.reminder);
+        for (let i = 0; i < occurrences.length; i++) tryNotify(occurrences[i], ev);
+      }
+    }
     /* Multi-day timed events: remind on each day they span, at the event time. */
     for (const ev of getSpanningEventsForKey(state, nowKey)) tryNotify(nowKey, ev);
     if (dirty) saveNotified(state);
+  }
+
+  /* Occurrence dates from today through the reminder horizon (at most two days,
+     because the longest reminder is one day). */
+  function reminderOccurrenceKeys(startKey, recurrence, nowKey, reminderMin) {
+    const minutes = REMINDER_MINUTES.indexOf(reminderMin) === -1 ? 0 : reminderMin;
+    const horizonDays = Math.min(2, Math.ceil(minutes / 1440) + 1);
+    const end = addDaysKey(nowKey, horizonDays);
+    const keys = [];
+    if (startKey >= nowKey && startKey <= end) keys.push(startKey);
+    const start = parseDateKey(startKey);
+    let key = nowKey;
+    while (key <= end) {
+      if (key !== startKey && isRecurringOnDate(start, parseDateKey(key), recurrence)) keys.push(key);
+      key = addDaysKey(key, 1);
+    }
+    return keys;
   }
 
   const LAST_BACKUP_KEY = 'seclusa-calendar-last-backup';
@@ -1939,6 +2017,7 @@
       const done = (v) => {
         if (settled) return;
         settled = true;
+        input.value = '';
         cleanup();
         if (dlg.open) dlg.close();
         resolve(v);
@@ -2231,8 +2310,11 @@
       const val = line.slice(ci + 1);
       const prior = cur[name] ? cur[name] + '\n' : '';
       cur[name] = (prior + val).slice(0, 10000);
+      const base = name.split(';')[0];
+      if (base !== name && cur[base] == null) cur[base] = cur[name];
     }
 
+    const previousEvents = state.events;
     if (!merge) state.events = {};
 
     let count = 0;
@@ -2309,6 +2391,7 @@
     }
 
     if (count === 0) {
+      state.events = previousEvents;
       alert('No events found in this .ics file');
       return;
     }
@@ -2647,7 +2730,7 @@
     if (dayEvents.length > 0) {
       const hl = document.createElement('div');
       hl.className = 'date-highlight';
-      hl.style.background = dayEvents[0].color || '#6cb5e6';
+      hl.style.background = safeCssColor(dayEvents[0].color);
       hl.title = dayEvents.map((ev) => ev.title).join(', ');
       cell.appendChild(hl);
     }
@@ -2719,12 +2802,11 @@
       evs.forEach((ev) => {
         const pill = document.createElement('div');
         pill.className = 'week-event';
-        pill.style.background = ev.color || '#6cb5e6';
+        pill.style.background = safeCssColor(ev.color);
         if (ev.holiday) pill.classList.add('holiday');
-        const minutes = ev.time ? timeToMinutes(ev.time) : 0;
-        const endMin = ev.endTime ? timeToMinutes(ev.endTime) : Math.min(minutes + 60, 1440);
-        pill.style.top = (minutes / 60) * hourPx + 'px';
-        pill.style.height = Math.max(((endMin - minutes) / 60) * hourPx, 22) + 'px';
+        const span = weekEventMinutes(ev, key);
+        pill.style.top = (span.minutes / 60) * hourPx + 'px';
+        pill.style.height = Math.max(((span.endMin - span.minutes) / 60) * hourPx, 22) + 'px';
         pill.textContent = (ev.time ? ev.time.slice(0, 5) + ' ' : '') + ev.title;
         pill.title = ev.title;
         if (!ev.holiday && !ev.important) {
@@ -2878,7 +2960,7 @@
 
       const bar = document.createElement('div');
       bar.className = 'event-color-bar';
-      bar.style.background = ev.color || '#6cb5e6';
+      bar.style.background = safeCssColor(ev.color);
       item.appendChild(bar);
 
       const info = document.createElement('div');
@@ -2960,7 +3042,7 @@
 
           const bar = document.createElement('div');
           bar.className = 'event-color-bar';
-          bar.style.background = ev.color || '#6cb5e6';
+          bar.style.background = safeCssColor(ev.color);
           item.appendChild(bar);
 
           const info = document.createElement('div');
@@ -3119,9 +3201,10 @@
   }
 
   function setEventColor(color) {
-    document.getElementById('event-color').value = color;
+    const safe = /^#[0-9a-fA-F]{6}$/.test(color || '') ? color : '#1b5e9e';
+    document.getElementById('event-color').value = safe;
     document.querySelectorAll('.color-dot').forEach((dot) => {
-      const active = dot.dataset.color === color;
+      const active = dot.dataset.color === safe;
       dot.classList.toggle('active', active);
       dot.setAttribute('aria-pressed', String(active));
     });
@@ -3388,7 +3471,7 @@
       item.className = 'birthday-item';
       const bar = document.createElement('div');
       bar.className = 'event-color-bar';
-      bar.style.background = ev.color || '#6cb5e6';
+      bar.style.background = safeCssColor(ev.color);
       item.appendChild(bar);
       const info = document.createElement('div');
       info.className = 'birthday-info';
@@ -3435,8 +3518,8 @@
         ? arr
             .filter((x) => x && typeof x === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || '')))
             .map((x) => ({
-              id: String(x.id || safeId()).slice(0, 100),
-              name: String(x.name || '').slice(0, 40),
+              id: String(x.id || safeId()).replace(/[\r\n]/g, '').slice(0, 100),
+              name: String(x.name || '').replace(/[\r\n]/g, '').slice(0, 40),
               date: x.date,
               yearly: x.yearly !== false,
             }))
@@ -3498,9 +3581,12 @@
     COUNTDOWN_STORAGE_KEY,
     NOTIFIED_STORAGE_KEY,
     STORAGE_KEY + '_unreadable',
+    LAST_BACKUP_KEY,
     'ambr3_calendar_accent',
     'privacy_calendar_theme',
     'ssc.pref_key_night_mode',
+    'ssc.pref_key_bg',
+    'ssc.pref_key_bg_custom',
   ];
 
   function clearAllData() {
@@ -3610,7 +3696,7 @@
       item.className = 'search-result-item';
       const bar = document.createElement('div');
       bar.className = 'event-color-bar';
-      bar.style.background = ev.color || '#6cb5e6';
+      bar.style.background = safeCssColor(ev.color);
       const info = document.createElement('div');
       info.className = 'search-result-info';
       const title = document.createElement('div');
@@ -4143,11 +4229,15 @@
       addDaysKey,
       dayOffset,
       timeToMinutes,
+      weekEventMinutes,
       formatTime,
       formatTimeRange,
       isRecurringOnDate,
       nextRecurringKey,
       sanitizeEvent,
+      safeCssColor,
+      reminderOccurrenceKeys,
+      importIcs,
       createInitialState,
       applyCalendarImport,
       parseIcsDateTime,

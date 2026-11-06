@@ -7,7 +7,7 @@ server sending anything anywhere.
 
 ## Features
 
-- Version 0.3.8
+- Version 0.3.9
 - Month, week and year views
 - Events with a time, colour, note, recurrence and an optional reminder
 - Holidays and countdowns, with birthdays as a separate list
