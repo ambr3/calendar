@@ -2,6 +2,11 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.11 — 2026-11-07
+
+### Fixed
+- PWA install on GitHub Pages: dropped the relative `id` that resolved outside `/calendar/`.
+
 ## 0.3.10 — 2026-11-07
 
 ### Changed
