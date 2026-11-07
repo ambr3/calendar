@@ -2,6 +2,14 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.10 — 2026-11-07
+
+### Changed
+- PWA icon is a white tile with a black **31**.
+
+### Fixed
+- Encrypted backup rejects overlong passwords and unsupported key-derivation settings.
+
 ## 0.3.9 — 2026-11-06
 
 ### Changed

@@ -3,13 +3,12 @@
 
     python3 tools/make_icons.py
 
-Needs Pillow. Black on white, same weight as the Notes icon: a solid
-calendar page, white header, and a day grid with one day marked.
+Needs Pillow. White tile, black 31 — same palette as Notes.
 """
 
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -17,21 +16,13 @@ ROOT = HERE.parent
 SIZE = 1024
 BG = (255, 255, 255, 255)
 FG = (10, 10, 10, 255)
-WHITE = (255, 255, 255, 255)
-
-# Shared geometry in a 1024 box. The mark stays inside the maskable safe zone.
-RINGS = (392, 632)
-RING_Y = 210
-RING_R = 42
-BODY = (196, 230, 828, 850)
-BODY_R = 72
-HEADER = (248, 308, 776, 372)
-HEADER_R = 12
-GRID_ORIGIN = (263, 408)
-CELL = 108
-GAP = 22
-COLS, ROWS = 4, 3
-TODAY = (2, 1)
+MARK = "31"
+FONTS = (
+    "/usr/share/fonts/julietaula-montserrat-fonts/Montserrat-Black.otf",
+    "/usr/share/fonts/julietaula-montserrat-fonts/Montserrat-ExtraBold.otf",
+    "/usr/share/fonts/open-sans/OpenSans-ExtraBold.ttf",
+    "/usr/share/fonts/google-droid-sans-fonts/DroidSans-Bold.ttf",
+)
 
 
 def rounded_mask(size, radius):
@@ -40,22 +31,23 @@ def rounded_mask(size, radius):
     return mask
 
 
-def draw_mark(draw):
-    for cx in RINGS:
-        draw.ellipse(
-            [cx - RING_R, RING_Y - RING_R, cx + RING_R, RING_Y + RING_R],
-            fill=FG,
-        )
-    draw.rounded_rectangle(BODY, radius=BODY_R, fill=FG)
-    draw.rounded_rectangle(HEADER, radius=HEADER_R, fill=WHITE)
-    x0, y0 = GRID_ORIGIN
-    for r in range(ROWS):
-        for c in range(COLS):
-            if (c, r) == TODAY:
-                continue
-            x = x0 + c * (CELL + GAP)
-            y = y0 + r * (CELL + GAP)
-            draw.rounded_rectangle([x, y, x + CELL, y + CELL], radius=16, fill=WHITE)
+def load_font(px):
+    for path in FONTS:
+        try:
+            return ImageFont.truetype(path, px)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def draw_mark(draw, size):
+    # Keep the digits inside the maskable safe zone (~72% of the tile).
+    font = load_font(int(size * 0.58))
+    box = draw.textbbox((0, 0), MARK, font=font)
+    tw, th = box[2] - box[0], box[3] - box[1]
+    x = (size - tw) / 2 - box[0]
+    y = (size - th) / 2 - box[1] - size * 0.02
+    draw.text((x, y), MARK, font=font, fill=FG)
 
 
 def render(maskable):
@@ -63,35 +55,16 @@ def render(maskable):
     if not maskable:
         tile = Image.new("RGBA", (SIZE, SIZE), BG)
         image.paste(tile, (0, 0), rounded_mask(SIZE, 200))
-    draw_mark(ImageDraw.Draw(image))
+    draw_mark(ImageDraw.Draw(image), SIZE)
     return image
 
 
 def write_svg(path, maskable=False):
-    cells = []
-    x0, y0 = GRID_ORIGIN
-    for r in range(ROWS):
-        for c in range(COLS):
-            if (c, r) == TODAY:
-                continue
-            x = x0 + c * (CELL + GAP)
-            y = y0 + r * (CELL + GAP)
-            cells.append(
-                f'  <rect x="{x}" y="{y}" width="{CELL}" height="{CELL}" rx="16" fill="#ffffff"/>'
-            )
-    rings = "\n".join(
-        f'  <circle cx="{cx}" cy="{RING_Y}" r="{RING_R}" fill="#0a0a0a"/>' for cx in RINGS
-    )
-    x0, y0, x1, y1 = BODY
-    hx0, hy0, hx1, hy1 = HEADER
     rx = "0" if maskable else "200"
     path.write_text(
         f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Seclusa Calendar">
   <rect width="1024" height="1024" rx="{rx}" fill="#ffffff"/>
-{rings}
-  <rect x="{x0}" y="{y0}" width="{x1 - x0}" height="{y1 - y0}" rx="{BODY_R}" fill="#0a0a0a"/>
-  <rect x="{hx0}" y="{hy0}" width="{hx1 - hx0}" height="{hy1 - hy0}" rx="{HEADER_R}" fill="#ffffff"/>
-{chr(10).join(cells)}
+  <text x="512" y="560" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-weight="900" font-size="580" fill="#0a0a0a">31</text>
 </svg>
 ''',
         encoding="utf-8",
