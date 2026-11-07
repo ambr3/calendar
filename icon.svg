@@ -1,4 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Seclusa Calendar">
   <rect width="1024" height="1024" rx="200" fill="#ffffff"/>
-  <text x="512" y="560" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-weight="900" font-size="580" fill="#0a0a0a">31</text>
+  <!-- 3 -->
+  <path fill="#0a0a0a" d="M250 250h330c120 0 200 70 200 175 0 70-35 120-100 145 85 25 135 85 135 175 0 120-90 205-235 205H250V825h310c85 0 135-45 135-115s-50-115-135-115H360V580h250c75 0 120-40 120-100s-45-100-120-100H250V250z"/>
+  <!-- 1 -->
+  <path fill="#0a0a0a" d="M700 250h140v550H700z"/>
 </svg>

@@ -4,6 +4,7 @@
     python3 tools/make_icons.py
 
 Needs Pillow. White tile, black 31 — same palette as Notes.
+SVG uses drawn paths (no <text>), so favicons do not depend on fonts.
 """
 
 from pathlib import Path
@@ -25,12 +26,6 @@ FONTS = (
 )
 
 
-def rounded_mask(size, radius):
-    mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, size - 1, size - 1], radius=radius, fill=255)
-    return mask
-
-
 def load_font(px):
     for path in FONTS:
         try:
@@ -41,7 +36,6 @@ def load_font(px):
 
 
 def draw_mark(draw, size):
-    # Keep the digits inside the maskable safe zone (~72% of the tile).
     font = load_font(int(size * 0.58))
     box = draw.textbbox((0, 0), MARK, font=font)
     tw, th = box[2] - box[0], box[3] - box[1]
@@ -50,21 +44,23 @@ def draw_mark(draw, size):
     draw.text((x, y), MARK, font=font, fill=FG)
 
 
-def render(maskable):
-    image = Image.new("RGBA", (SIZE, SIZE), BG if maskable else (0, 0, 0, 0))
-    if not maskable:
-        tile = Image.new("RGBA", (SIZE, SIZE), BG)
-        image.paste(tile, (0, 0), rounded_mask(SIZE, 200))
+def render():
+    # Opaque white field — some install checks dislike transparent corners.
+    image = Image.new("RGBA", (SIZE, SIZE), BG)
     draw_mark(ImageDraw.Draw(image), SIZE)
     return image
 
 
 def write_svg(path, maskable=False):
+    # Geometric 31 paths (no fonts). Coordinates in a 1024 box.
     rx = "0" if maskable else "200"
     path.write_text(
         f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Seclusa Calendar">
   <rect width="1024" height="1024" rx="{rx}" fill="#ffffff"/>
-  <text x="512" y="560" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-weight="900" font-size="580" fill="#0a0a0a">31</text>
+  <!-- 3 -->
+  <path fill="#0a0a0a" d="M250 250h330c120 0 200 70 200 175 0 70-35 120-100 145 85 25 135 85 135 175 0 120-90 205-235 205H250V825h310c85 0 135-45 135-115s-50-115-135-115H360V580h250c75 0 120-40 120-100s-45-100-120-100H250V250z"/>
+  <!-- 1 -->
+  <path fill="#0a0a0a" d="M700 250h140v550H700z"/>
 </svg>
 ''',
         encoding="utf-8",
@@ -72,10 +68,10 @@ def write_svg(path, maskable=False):
 
 
 def main():
-    master = render(maskable=False)
+    master = render()
     for size in (192, 512):
         master.resize((size, size), Image.Resampling.LANCZOS).save(ROOT / f"icon-{size}.png")
-    render(maskable=True).resize((512, 512), Image.Resampling.LANCZOS).save(ROOT / "icon-maskable-512.png")
+    master.resize((512, 512), Image.Resampling.LANCZOS).save(ROOT / "icon-maskable-512.png")
     write_svg(ROOT / "icon.svg", maskable=False)
     write_svg(ROOT / "icon-maskable.svg", maskable=True)
     for name in (
