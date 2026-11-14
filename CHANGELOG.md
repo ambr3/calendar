@@ -2,6 +2,11 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.12 — 2026-11-14
+
+### Fixed
+- iOS status bar uses `black` instead of `black-translucent` (no top blur).
+
 ## 0.3.11 — 2026-11-07
 
 ### Fixed
