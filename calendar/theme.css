@@ -27,8 +27,9 @@
    The three blocks below used to carry three copies of the same hex values.
    They now only say which theme is in force; the tokens follow. */
 #pane-calendar {
-  height: 100%;
-  max-height: 100%;
+  flex: 1 1 auto;
+  height: auto;
+  max-height: none;
   min-height: 0;
   font-family: var(--font-body);
   color: var(--text);
@@ -96,7 +97,30 @@
   overflow: hidden;
   max-width: 560px;
   margin: 0 auto;
-  padding: 0 12px 8px;
+  padding: 0 12px 0;
+}
+
+#pane-calendar .site-foot {
+  flex: 0 0 auto;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+#pane-calendar .made-with {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+#pane-calendar .made-with a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+#pane-calendar .made-with a:hover {
+  color: var(--text);
 }
 
 /* ===== HEADER ===== */
@@ -160,14 +184,24 @@
 }
 
 #pane-calendar #btn-cal-menu {
-  color: var(--text);
-  background: var(--glass);
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-radius: 999px;
+  color: var(--warm);
+  background: var(--surface);
   border-color: var(--glass-border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
+}
+#pane-calendar #btn-cal-menu svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 1.75;
 }
 
 #pane-calendar #btn-cal-menu[aria-expanded='true'] {
-  color: var(--primary);
+  color: var(--warm);
   border-color: color-mix(in srgb, var(--primary) 45%, var(--glass-border));
   background: color-mix(in srgb, var(--primary) 14%, var(--glass));
 }
@@ -198,38 +232,80 @@
   color: var(--on-primary);
 }
 
-#pane-calendar #sheet-cal,
 #pane-calendar #cal-scrim {
-  /* Sheets live inside the pane; keep them above calendar chrome. */
   position: fixed;
-}
-#pane-calendar #cal-scrim {
   z-index: 45;
+  background: transparent;
 }
 #pane-calendar #sheet-cal {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 58px);
+  left: 10px;
+  right: auto;
+  bottom: auto;
   z-index: 55;
+  width: min(248px, calc(100vw - 20px));
+  max-height: min(70vh, 460px);
+  margin: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
   color: var(--text);
-  background: var(--glass-strong);
-  border-color: var(--glass-border);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  transform: none;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, visibility 0s linear 0.15s;
 }
-#pane-calendar #sheet-cal h3 {
-  color: var(--text-muted);
+#pane-calendar #sheet-cal.open {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+  transition: opacity 0.15s ease, visibility 0s;
+}
+#pane-calendar #sheet-cal button.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text);
+}
+#pane-calendar #sheet-cal button.row svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 #pane-calendar #sheet-cal button.row:hover {
-  background: var(--glass-faint);
+  background: var(--surface-2);
 }
 #pane-calendar #sheet-cal button.row.active {
   background: color-mix(in srgb, var(--primary) 14%, transparent);
   color: var(--primary);
 }
 #pane-calendar #sheet-cal button.row svg {
-  color: var(--text-secondary);
+  color: var(--text-dim);
 }
 #pane-calendar #sheet-cal button.row.active svg {
   color: var(--primary);
 }
 #pane-calendar #sheet-cal .sep {
-  background: var(--glass-border);
+  background: var(--border);
+  margin: 4px 8px;
 }
 
 /* ===== TOOLBAR / VIEW SWITCH ===== */
@@ -267,7 +343,7 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
-  padding: 8px 14px;
+  padding: 8px 11px;
   min-height: 32px;
   border-radius: 999px;
   cursor: pointer;
@@ -297,19 +373,114 @@
   -webkit-backdrop-filter: var(--blur);
   backdrop-filter: var(--blur);
   border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
+  border-radius: 22px;
   box-shadow:
     var(--shadow-md),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
   padding: 10px 6px 8px;
 }
 
+#calendar[data-view="month"] {
+  overflow: hidden;
+}
+
 #month-view {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  gap: 8px;
+}
+
+.month-deck {
+  appearance: none;
+  container-type: size;
+  flex: 1 1 50%;
+  min-height: 0;
+  margin: 0;
+  padding: 3.2cqh 5.5cqw 2.4cqh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 0;
+  border: none;
+  border-radius: 28px;
+  background: var(--primary);
+  color: var(--on-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.month-deck-weekday {
+  flex: 0 0 auto;
+  font-size: 8.4cqh;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  text-transform: none;
+  color: var(--warm);
+}
+
+.month-deck-num {
+  flex: 0 0 auto;
+  margin-top: 0.8cqh;
+  font-size: min(98cqw, 84cqh);
+  font-weight: 800;
+  line-height: 0.8;
+  letter-spacing: -0.04em;
+}
+
+.month-deck-next {
+  flex: 0 0 auto;
+  margin-top: 0.6cqh;
+  padding-top: 1.8cqh;
+  width: 64%;
+  border-top: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+  font-size: max(0.95rem, 4.8cqh);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Night mode accent is pure white. Ease it so the day panel is not glaring. */
+#pane-calendar[data-theme='dark'] .month-deck,
+#pane-calendar[data-theme='dark'] .day-cell.today,
+#pane-calendar[data-theme='dark'] .day-cell.today:hover,
+#pane-calendar[data-theme='dark'] .day-cell.today.selected {
+  background: #bdbdbd;
+}
+
+@media (prefers-color-scheme: dark) {
+  #pane-calendar:not([data-theme='light']) .month-deck,
+  #pane-calendar:not([data-theme='light']) .day-cell.today,
+  #pane-calendar:not([data-theme='light']) .day-cell.today:hover,
+  #pane-calendar:not([data-theme='light']) .day-cell.today.selected {
+    background: #bdbdbd;
+  }
+}
+
+#pane-calendar[data-theme='light'] .month-deck,
+#pane-calendar[data-theme='light'] .day-cell.today,
+#pane-calendar[data-theme='light'] .day-cell.today:hover,
+#pane-calendar[data-theme='light'] .day-cell.today.selected {
+  background: #333333;
+}
+
+@media (prefers-color-scheme: light) {
+  #pane-calendar:not([data-theme='dark']) .month-deck,
+  #pane-calendar:not([data-theme='dark']) .day-cell.today,
+  #pane-calendar:not([data-theme='dark']) .day-cell.today:hover,
+  #pane-calendar:not([data-theme='dark']) .day-cell.today.selected {
+    background: #333333;
+  }
 }
 
 #weekday-header {
@@ -329,50 +500,54 @@
 }
 
 #days-grid {
-  flex: 1 1 0;
+  flex: 1 1 50%;
   min-height: 0;
   overflow: hidden;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(6, minmax(0, 1fr));
-  gap: 3px;
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 6px;
 }
 
 /* ===== DAY CELLS ===== */
 .day-cell {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 0;
-  padding: 2px 1px;
-  border-radius: var(--radius-sm);
+  height: auto;
+  padding: 0;
+  border-radius: 18px;
   border: 1px solid transparent;
   background: var(--glass-faint);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
   overflow: hidden;
 }
 
 .day-cell:hover {
   background: var(--glass-strong);
-  border-color: var(--glass-border);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
 }
 
-.day-cell:hover .day-number {
-  transform: scale(1.14);
+.day-cell.other-month .day-number {
+  color: var(--text-muted);
+  opacity: 0.45;
 }
 
-.day-cell.other-month {
-  opacity: 0.22;
+.day-cell.other-month .date-highlight {
+  opacity: 0.45;
 }
 
 .day-cell.today {
-  background: var(--primary-grad);
+  background: var(--primary);
   border-color: transparent;
-  box-shadow: var(--accent-glow);
+  box-shadow: none;
+}
+
+.day-cell.today:hover {
+  background: var(--primary);
 }
 
 .day-cell.today .day-number {
@@ -381,44 +556,48 @@
 }
 
 .day-cell.selected {
-  background: var(--primary-dim);
   border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
 }
 
 .day-cell.today.selected {
-  background: var(--primary-grad);
-  box-shadow:
-    0 0 0 2px var(--glass-strong),
-    0 0 0 4px var(--primary),
-    var(--accent-glow);
+  background: var(--primary);
+  border-color: transparent;
+  box-shadow: inset 0 0 0 2px var(--on-primary);
 }
 
 .day-number {
-  font-size: clamp(0.72rem, 2.6vw, 0.9rem);
+  font-size: clamp(0.85rem, 3.5vw, 1.05rem);
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1;
   color: var(--text);
-  transition: transform 0.14s ease;
 }
 
 .date-highlight {
-  width: 60%;
-  max-width: 44px;
-  min-width: 12px;
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 4px;
   height: 4px;
-  border-radius: 999px;
-  margin: 2px auto 0;
+  min-width: 0;
+  max-width: none;
+  border-radius: 50%;
+  margin: 0;
+  transform: translateX(-50%);
   flex-shrink: 0;
   opacity: 0.95;
 }
 
+.day-cell.today .date-highlight {
+  background: var(--on-primary) !important;
+}
+
 /* ===== BOTTOM PANELS ===== */
 #holidays-panel,
-#event-panel,
 #countdowns-panel,
 #birthdays-panel {
   position: fixed;
-  bottom: var(--app-nav-h, 72px);
+  bottom: var(--app-nav-h, 0px);
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
@@ -432,20 +611,35 @@
   padding: 0 24px 16px;
   box-shadow: var(--shadow-lg);
   z-index: 30;
-  max-height: calc(62vh - var(--app-nav-h, 72px));
-  max-height: calc(62dvh - var(--app-nav-h, 72px));
+  max-height: calc(62vh - var(--app-nav-h, 0px));
+  max-height: calc(62dvh - var(--app-nav-h, 0px));
   overflow-y: auto;
 }
 
 [data-theme='dark'] #holidays-panel,
-[data-theme='dark'] #event-panel,
 [data-theme='dark'] #countdowns-panel,
 #birthdays-panel {
   background: var(--glass-strong);
 }
 
+#event-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(70vh, 480px);
+  background: var(--surface);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 4px 16px 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  z-index: 60;
+  overflow-y: auto;
+}
+
 #holidays-panel::before,
-#event-panel::before,
 #countdowns-panel::before,
 #birthdays-panel::before {
   content: '';
@@ -797,15 +991,15 @@
 
 /* ===== MONTH EVENTS LIST ===== */
 #month-events-list {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
-  max-height: min(32vh, 220px);
+  max-height: none;
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  margin-top: 8px;
-  border-top: 1px solid var(--glass-border);
+  margin-top: 0;
+  border-top: none;
   padding-top: 2px;
   padding-bottom: 4px;
 }
@@ -943,7 +1137,7 @@
 #settings-modal {
   position: fixed;
   inset: 0;
-  bottom: var(--app-nav-h, 72px);
+  bottom: var(--app-nav-h, 0px);
   background: var(--overlay);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
@@ -1400,7 +1594,10 @@
   }
 }
 
-#event-panel:not(.hidden),
+#event-panel:not(.hidden) {
+  animation: fadeIn 0.15s ease;
+}
+
 #holidays-panel:not(.hidden),
 #countdowns-panel:not(.hidden),
 #birthdays-panel:not(.hidden) {
@@ -2019,7 +2216,7 @@
     font-size: 1.05rem;
   }
   #pane-calendar .view-btn {
-    padding: 7px 10px;
+    padding: 7px 8px;
     font-size: 11px;
     min-height: 30px;
   }

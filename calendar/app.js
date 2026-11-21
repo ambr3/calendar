@@ -297,7 +297,7 @@
       currentDate: new Date(),
       selectedDate: null,
       currentView: 'month',
-      weekStart: 0,
+      weekStart: 1,
       lang: 'en',
       appName: '',
       events: {},
@@ -422,7 +422,7 @@
   function loadSettings(state, LANGS) {
     try {
       const s = JSON.parse(safeGet(SETTINGS_KEY) || '{}');
-      if (s.weekStart === 0 || s.weekStart === 1) state.weekStart = s.weekStart;
+      state.weekStart = 1;
       if (s.lang && LANGS[s.lang]) state.lang = s.lang;
     } catch {
       /* keep defaults */
@@ -2434,7 +2434,7 @@
       state.countdowns = [];
       state.selectedCountries = DEFAULT_COUNTRIES.slice();
       state.enabledImportantDates = DEFAULT_IMPORTANT_DATES.slice();
-      state.weekStart = 0;
+      state.weekStart = 1;
       state.lang = 'en';
       applyAppName(state, '');
       applyImportedTheme('system');
@@ -2446,9 +2446,7 @@
       state.enabledImportantDates = data.settings.important.filter((id) => IMPORTANT_DATES_META[id]);
     }
     if (data.settings) {
-      if (data.settings.weekStart === 0 || data.settings.weekStart === 1) {
-        state.weekStart = data.settings.weekStart;
-      }
+      state.weekStart = 1;
       if (data.settings.lang && LANGS[data.settings.lang]) state.lang = data.settings.lang;
       if (typeof data.settings.theme === 'string') applyImportedTheme(data.settings.theme);
       if (typeof data.settings.appName === 'string') applyAppName(state, data.settings.appName);
@@ -2626,8 +2624,11 @@
     const currentMonthEl = document.getElementById('current-month');
     currentMonthEl.textContent = viewTitle(state);
     updateViewButtons(state);
+    const cal = document.getElementById('calendar');
+    if (cal) cal.dataset.view = state.currentView;
     if (state.currentView === 'week') return renderWeekView(state, helpers);
     if (state.currentView === 'year') return renderYearView(state, helpers);
+    if (state.currentView === 'list') return renderListView(state, helpers);
     renderMonthView(state, helpers);
   }
 
@@ -2701,8 +2702,21 @@
     for (let day = 1; day <= remaining; day++) {
       cells.push(createDayCell(state, helpers, new Date(year, month + 1, day), day, true, false));
     }
+    const weeks = Math.max(1, Math.ceil(cells.length / 7));
+    daysGrid.style.gridTemplateRows = 'repeat(' + weeks + ', minmax(0, 1fr))';
     cells.forEach((c) => daysGrid.appendChild(c));
+    renderMonthDeck(state, helpers);
 
+    const list = document.getElementById('month-events-list');
+    list.classList.add('hidden');
+    list.classList.remove('as-view');
+    list.textContent = '';
+  }
+
+  function renderListView(state, helpers) {
+    document.getElementById('month-view').classList.add('hidden');
+    document.getElementById('week-view').classList.add('hidden');
+    document.getElementById('year-view').classList.add('hidden');
     renderMonthEventsList(state, helpers);
   }
 
@@ -2719,7 +2733,7 @@
 
     const key = dateKey(date.getFullYear(), date.getMonth(), date.getDate());
     cell.dataset.key = key;
-    if (state.selectedDate && key === state.selectedDate) cell.classList.add('selected');
+    if (key === deckFocusKey(state)) cell.classList.add('selected');
 
     const num = document.createElement('div');
     num.className = 'day-number';
@@ -2736,8 +2750,78 @@
     }
 
     setupDrop(state, cell, () => renderCalendar(state));
-    cell.addEventListener('click', () => openPanel(state, helpers, key));
+    cell.addEventListener('click', () => {
+      if (state.selectedDate === key) {
+        openPanel(state, helpers, key);
+        return;
+      }
+      state.selectedDate = key;
+      renderCalendar(state);
+    });
     return cell;
+  }
+
+  /* Day shown in the deck: the selected date when it is in this month, otherwise today, otherwise the 1st. */
+  function deckFocusKey(state) {
+    const year = state.currentDate.getFullYear();
+    const month = state.currentDate.getMonth();
+    if (state.selectedDate) {
+      const picked = parseDateKey(state.selectedDate);
+      if (picked.getFullYear() === year && picked.getMonth() === month) return state.selectedDate;
+    }
+    const today = parseDateKey(getTodayKey());
+    if (today.getFullYear() === year && today.getMonth() === month) return getTodayKey();
+    return dateKey(year, month, 1);
+  }
+
+  function deckNextLine(state, key) {
+    const events = getEventsForKey(state, key).slice().sort((a, b) => {
+      if (a.holiday && !b.holiday) return -1;
+      if (!a.holiday && b.holiday) return 1;
+      return timeToMinutes(a.time) - timeToMinutes(b.time);
+    });
+    if (!events.length) return 'Nothing on';
+    let ev = events[0];
+    if (key === getTodayKey()) {
+      const now = new Date();
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const upcoming = events.find((item) => item.time && timeToMinutes(item.time) >= nowMin);
+      if (upcoming) ev = upcoming;
+    }
+    let when = '';
+    if (key === getTodayKey() && ev.time) {
+      const now = new Date();
+      const mins = timeToMinutes(ev.time) - (now.getHours() * 60 + now.getMinutes());
+      if (mins > 0 && mins < 60) when = 'in ' + mins + ' min';
+      else if (mins >= 60) {
+        const hours = Math.round(mins / 60);
+        when = 'in ' + hours + (hours === 1 ? ' hour' : ' hours');
+      }
+    }
+    if (!when && ev.time) when = formatTimeRange(ev.time, ev.endTime);
+    else if (!when && ev.holiday) when = 'Public holiday';
+    else if (!when && ev.important) when = 'Important';
+    const title = ev.title || 'Event';
+    const more = events.length > 1 ? '  +' + (events.length - 1) : '';
+    return when ? title + ' · ' + when + more : title + more;
+  }
+
+  function renderMonthDeck(state, helpers) {
+    const key = deckFocusKey(state);
+    const d = parseDateKey(key);
+    const deck = document.getElementById('month-deck');
+    const weekday = document.getElementById('month-deck-weekday');
+    const num = document.getElementById('month-deck-num');
+    const next = document.getElementById('month-deck-next');
+    if (!deck || !weekday || !num || !next) return;
+    const locales = { en: 'en-GB', fr: 'fr-FR', de: 'de-DE', es: 'es-ES', it: 'it-IT', nl: 'nl-NL', pt: 'pt-PT', tr: 'tr-TR', sr: 'sr', 'sr-lat': 'sr-Latn' };
+    const weekdayName = d.toLocaleDateString(locales[state.lang] || 'en-GB', { weekday: 'long' });
+    weekday.textContent = weekdayName;
+    num.textContent = d.getDate();
+    const line = deckNextLine(state, key);
+    next.textContent = line;
+    deck.setAttribute('aria-label', weekdayName + ' ' + d.getDate() + '. ' + line + '. Open day');
+    deck.dataset.key = key;
   }
 
   function renderWeekView(state, helpers) {
@@ -2746,7 +2830,9 @@
     document.getElementById('days-grid').classList.add('hidden');
     document.getElementById('month-view').classList.add('hidden');
     document.getElementById('year-view').classList.add('hidden');
-    document.getElementById('month-events-list').classList.add('hidden');
+    const weekList = document.getElementById('month-events-list');
+    weekList.classList.add('hidden');
+    weekList.classList.remove('as-view');
     const wk = document.getElementById('week-view');
     wk.classList.remove('hidden');
     wk.textContent = '';
@@ -2848,7 +2934,9 @@
     document.getElementById('days-grid').classList.add('hidden');
     document.getElementById('month-view').classList.add('hidden');
     document.getElementById('week-view').classList.add('hidden');
-    document.getElementById('month-events-list').classList.add('hidden');
+    const yearList = document.getElementById('month-events-list');
+    yearList.classList.add('hidden');
+    yearList.classList.remove('as-view');
     const yv = document.getElementById('year-view');
     yv.classList.remove('hidden');
     yv.textContent = '';
@@ -2923,8 +3011,13 @@
       getEventsForKey(state, key).forEach((ev) => rows.push({ key, day, ev }));
     }
 
+    el.classList.add('as-view');
+    el.classList.remove('hidden');
     if (rows.length === 0) {
-      el.classList.add('hidden');
+      const empty = document.createElement('div');
+      empty.className = 'month-list-title';
+      empty.textContent = 'No events this month';
+      el.appendChild(empty);
       return;
     }
 
@@ -3607,13 +3700,6 @@
     if (window.SeclusaTheme && typeof window.SeclusaTheme.set === 'function') {
       window.SeclusaTheme.set('system');
     }
-    if ('indexedDB' in window) {
-      try {
-        indexedDB.deleteDatabase('seclusa-calendar-export');
-      } catch {
-        /* database may already be gone */
-      }
-    }
     window.location.reload();
   }
 
@@ -3801,7 +3887,6 @@
   }
 
   function populateSettings(state) {
-    document.getElementById('week-start-select').value = String(state.weekStart);
     const ls = document.getElementById('lang-select');
     const langNames = {
       en: 'English',
@@ -3881,6 +3966,14 @@
     document.getElementById('jump-close').addEventListener('click', () => {
       jumpPop.classList.add('hidden');
     });
+
+    const monthDeck = document.getElementById('month-deck');
+    if (monthDeck) {
+      monthDeck.addEventListener('click', () => {
+        const key = monthDeck.dataset.key;
+        if (key) openPanel(state, helpers, key);
+      });
+    }
 
     document.querySelectorAll('#pane-calendar .view-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -4031,11 +4124,6 @@
     document.getElementById('close-settings').addEventListener('click', closeSettings);
     document.getElementById('settings-modal').addEventListener('click', (e) => {
       if (e.target.id === 'settings-modal') closeSettings();
-    });
-    document.getElementById('week-start-select').addEventListener('change', (e) => {
-      state.weekStart = parseInt(e.target.value, 10);
-      saveSettings(state);
-      renderCalendar(state);
     });
     document.getElementById('lang-select').addEventListener('change', (e) => {
       state.lang = e.target.value;

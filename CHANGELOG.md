@@ -2,6 +2,18 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.13 — 2026-11-21
+
+### Changed
+- Month opens on a Today deck: large date, weekday, and the next event, with the keypad filling the rest of the card.
+- Menu, Theme, Backup, About, and the day view open as cards. The bottom bar is gone; every option is in the menu.
+- Week always starts on Monday. Footer shows the GPL link, made-with line, and version.
+- Theme is System / Light / Dark only. Orange lines stay; solid background swatches are gone.
+- Deck and today cell use a softer night grey and a softer day charcoal.
+
+### Removed
+- Unused background-swatch code, sheet grabbers, and the local icon preview page.
+
 ## 0.3.12 — 2026-11-14
 
 ### Fixed
