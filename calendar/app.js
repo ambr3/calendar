@@ -4101,22 +4101,6 @@
       el.addEventListener('focus', () => scrollInputIntoView(el));
     });
 
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', () => {
-        const formActions = document.querySelector('#event-form .form-actions');
-        const modalContent = eventModal.querySelector('.modal-content');
-        if (!formActions || !modalContent) return;
-        const bottom = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
-        if (bottom > 50) {
-          modalContent.style.maxHeight = window.visualViewport.height + 'px';
-          modalContent.style.transform = 'translateY(' + -bottom + 'px)';
-        } else {
-          modalContent.style.maxHeight = '';
-          modalContent.style.transform = '';
-        }
-      });
-    }
-
     document.querySelectorAll('.color-dot').forEach((dot) => {
       dot.addEventListener('click', () => {
         const colorInput = document.getElementById('event-color');

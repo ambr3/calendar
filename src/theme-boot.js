@@ -48,4 +48,29 @@
   } catch (err) {
     /* Storage blocked, or no matchMedia. The dark default in the markup stands. */
   }
+
+  /* Keep the shell on the visible screen when the browser is zoomed or the
+     keyboard / toolbar changes the visual viewport. The layout viewport stays
+     tall; without this the page scrolls. */
+  function fitViewport() {
+    var vv = window.visualViewport;
+    var root = document.documentElement;
+    if (!vv) {
+      root.style.setProperty("--app-h", window.innerHeight + "px");
+      root.style.removeProperty("--app-w");
+      root.style.removeProperty("--app-top");
+      root.style.removeProperty("--app-left");
+      return;
+    }
+    root.style.setProperty("--app-h", vv.height + "px");
+    root.style.setProperty("--app-w", vv.width + "px");
+    root.style.setProperty("--app-top", vv.offsetTop + "px");
+    root.style.setProperty("--app-left", vv.offsetLeft + "px");
+  }
+  fitViewport();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fitViewport);
+    window.visualViewport.addEventListener("scroll", fitViewport);
+  }
+  window.addEventListener("orientationchange", fitViewport);
 })();

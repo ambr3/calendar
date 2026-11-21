@@ -2,6 +2,11 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.16 — 2026-11-21
+
+### Fixed
+- A zoomed mobile browser no longer makes the whole calendar scroll. The shell stays on the visible screen, and the week view still scrolls inside its hours.
+
 ## 0.3.15 — 2026-11-21
 
 ### Changed
