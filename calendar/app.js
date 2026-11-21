@@ -1859,13 +1859,28 @@
     }
   }
 
+  function notificationPermission() {
+    try {
+      if (typeof Notification === 'undefined') return 'unsupported';
+      return Notification.permission;
+    } catch {
+      return 'unsupported';
+    }
+  }
+
   function syncReminderBtn() {
     const btn = document.getElementById('reminder-permission-btn');
     if (!btn) return;
-    if (Notification.permission === 'granted') {
+    const permission = notificationPermission();
+    if (permission === 'unsupported') {
+      btn.textContent = 'Notifications unavailable';
+      btn.disabled = true;
+      return;
+    }
+    if (permission === 'granted') {
       btn.textContent = 'Notifications enabled';
       btn.disabled = true;
-    } else if (Notification.permission === 'denied') {
+    } else if (permission === 'denied') {
       btn.textContent = 'Notifications blocked by browser';
       btn.disabled = true;
     } else {
@@ -1875,7 +1890,7 @@
   }
 
   function initReminders(state) {
-    if (!('Notification' in window)) return;
+    if (notificationPermission() === 'unsupported') return;
     const btn = document.getElementById('reminder-permission-btn');
     if (btn) {
       btn.addEventListener('click', () => {
@@ -1937,7 +1952,7 @@
   }
 
   function checkReminders(state) {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (notificationPermission() !== 'granted') return;
     const now = new Date();
     const nowKey = dateKey(now.getFullYear(), now.getMonth(), now.getDate());
     let dirty = false;

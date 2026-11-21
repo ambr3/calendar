@@ -53,7 +53,7 @@ function closeSheet() {
 (function () {
   const THEME_KEY = "ssc.pref_key_night_mode";
   const LEGACY_KEY = "privacy_calendar_theme";
-  const LIGHT = "#ffffff";
+  const LIGHT = "#e4e4e4";
   const DARK = "#0a0a0a";
 
   function safeGet(key) {

@@ -34,6 +34,8 @@
     } else {
       html.setAttribute("data-theme", "dark");
     }
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", html.getAttribute("data-theme") === "light" ? "#e4e4e4" : "#0a0a0a");
 
     try { html.removeAttribute("style"); } catch (err) { /* ignore */ }
     html.removeAttribute("data-bg");

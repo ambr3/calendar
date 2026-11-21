@@ -7,8 +7,8 @@ server sending anything anywhere.
 
 ## Features
 
-- Version 0.3.14
-- Month, week and year views
+- Version 0.3.15
+- Month, week, year and list views
 - Events with a time, colour, note, recurrence and an optional reminder
 - Holidays and countdowns, with birthdays as a separate list
 - Share or save backups as JSON (optional encryption) or iCalendar (.ics); 30-day reminder
@@ -18,7 +18,7 @@ server sending anything anywhere.
 
 ## Usage
 
-Open it and press **+** (or pick a day) to add an event.
+Open it, pick a day, then press **Add Event**.
 
 To add it to your home screen, open your browser's menu and choose "Add to Home
 Screen".

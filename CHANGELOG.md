@@ -2,6 +2,17 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.15 — 2026-11-21
+
+### Changed
+- Settings, search, public dates, countdowns, and birthdays open as centered cards. Theme, backup, about, and public dates live in Settings.
+- Dark is the default when nothing is saved. Light mode is a softer grey, and the browser chrome matches that grey.
+- A day with something on is slightly shaded, and the event colour is a line along the bottom.
+- An empty day says "Nothing on, time to relax".
+
+### Fixed
+- A browser that blocks notifications no longer stops the reminder control from being set up.
+
 ## 0.3.14 — 2026-11-21
 
 ### Fixed
