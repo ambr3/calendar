@@ -3,7 +3,8 @@
  * Page background stays the orange lines. No solid swatches, no Day/Night sky.
  *
  * Storage:
- *   ssc.pref_key_night_mode — light | dark | absent (= system)
+ *   ssc.pref_key_night_mode — light | dark | system
+ *   Absent means dark. Calendar defaults to dark, not the device theme.
  */
 (function () {
   var KEY_THEME = "ssc.pref_key_night_mode";
@@ -13,7 +14,7 @@
   function readPref() {
     try {
       var v = localStorage.getItem(KEY_THEME);
-      if (v === "light" || v === "dark") return v;
+      if (v === "light" || v === "dark" || v === "system") return v;
       var legacy = localStorage.getItem(LEGACY_KEY);
       if (legacy === "light") return "light";
       if (legacy === "dark" || legacy === "bw") return "dark";
@@ -26,9 +27,11 @@
   try {
     var html = document.documentElement;
     var saved = readPref();
-    if (saved) {
+    if (saved === "light" || saved === "dark") {
       html.setAttribute("data-theme", saved);
-    } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    } else if (saved === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+      html.setAttribute("data-theme", "light");
+    } else {
       html.setAttribute("data-theme", "dark");
     }
 
@@ -41,6 +44,6 @@
       }
     } catch (err) { /* ignore */ }
   } catch (err) {
-    /* Storage blocked, or no matchMedia. The light default in the markup stands. */
+    /* Storage blocked, or no matchMedia. The dark default in the markup stands. */
   }
 })();

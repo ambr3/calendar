@@ -86,22 +86,19 @@ function closeSheet() {
 
   function readMode() {
     const v = safeGet(THEME_KEY);
-    if (v === "light" || v === "dark") return v;
-    if (v === "system" || v === null || v === "") {
-      const legacy = safeGet(LEGACY_KEY);
-      if (legacy === "light") {
-        safeSet(THEME_KEY, "light");
-        safeRemove(LEGACY_KEY);
-        return "light";
-      }
-      if (legacy === "dark" || legacy === "bw") {
-        safeSet(THEME_KEY, "dark");
-        safeRemove(LEGACY_KEY);
-        return "dark";
-      }
-      return "system";
+    if (v === "light" || v === "dark" || v === "system") return v;
+    const legacy = safeGet(LEGACY_KEY);
+    if (legacy === "light") {
+      safeSet(THEME_KEY, "light");
+      safeRemove(LEGACY_KEY);
+      return "light";
     }
-    return "system";
+    if (legacy === "dark" || legacy === "bw") {
+      safeSet(THEME_KEY, "dark");
+      safeRemove(LEGACY_KEY);
+      return "dark";
+    }
+    return "dark";
   }
 
   function resolve(mode) {
@@ -129,8 +126,8 @@ function closeSheet() {
   }
 
   function setMode(mode) {
-    if (mode === "system") safeRemove(THEME_KEY);
-    else safeSet(THEME_KEY, mode);
+    if (mode !== "system" && mode !== "light" && mode !== "dark") mode = "dark";
+    safeSet(THEME_KEY, mode);
     safeRemove(LEGACY_KEY);
     applyMode(mode);
   }

@@ -131,7 +131,15 @@ body{
 .sheet button.row.danger svg{color:var(--danger)}
 .sheet .sep{height:1px;background:var(--border);margin:8px 10px}
 .sheet .note{padding:8px 14px;color:var(--text-dim);font-size:13px;line-height:1.5}
-.theme-mode-row{display:flex;flex-wrap:wrap;gap:8px;padding:4px 14px 12px}
+.theme-mode-row{display:flex;flex-wrap:wrap;gap:8px;padding:4px 0 8px}
+[data-theme="light"]{
+  --bg:#e4e4e4;
+  --surface:#f1f1f1;
+  --surface-2:#e8e8e8;
+  --surface-3:#dcdcdc;
+  --text:#1a1a1a;
+  --border:#c8c8c8;
+}
 .theme-chip{
   min-height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--border-strong);
   background:var(--surface-2);color:var(--text);font:inherit;font-size:13px;font-weight:600;

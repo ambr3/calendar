@@ -1843,7 +1843,7 @@
     ) {
       return window.SeclusaTheme.current();
     }
-    return 'system';
+    return 'dark';
   }
 
   function applyImportedTheme(raw) {
@@ -2521,7 +2521,7 @@
       state.weekStart = 1;
       state.lang = 'en';
       applyAppName(state, '');
-      applyImportedTheme('system');
+      applyImportedTheme('dark');
     }
     if (data.settings && Array.isArray(data.settings.countries)) {
       state.selectedCountries = data.settings.countries.filter((c) => COUNTRY_META[c]);
@@ -2826,6 +2826,7 @@
 
     const dayEvents = getEventsForKey(state, key);
     if (dayEvents.length > 0) {
+      cell.classList.add('has-events');
       const hl = document.createElement('div');
       hl.className = 'date-highlight';
       hl.style.background = safeCssColor(dayEvents[0].color);
@@ -2864,7 +2865,7 @@
       if (!a.holiday && b.holiday) return 1;
       return timeToMinutes(a.time) - timeToMinutes(b.time);
     });
-    if (!events.length) return 'Nothing on';
+    if (!events.length) return 'Nothing on, time to relax';
     let ev = events[0];
     if (key === getTodayKey()) {
       const now = new Date();
@@ -3784,7 +3785,7 @@
       }
     }
     if (window.SeclusaTheme && typeof window.SeclusaTheme.set === 'function') {
-      window.SeclusaTheme.set('system');
+      window.SeclusaTheme.set('dark');
     }
     window.location.reload();
   }
@@ -4118,13 +4119,13 @@
     });
 
     document.getElementById('holidays-btn').addEventListener('click', () => {
-      if (holidaysPanel.classList.contains('hidden')) {
-        openHolidaysPanel(state, helpers);
-      } else {
-        closeHolidaysPanel();
-      }
+      closeSettings();
+      openHolidaysPanel(state, helpers);
     });
     document.getElementById('close-holidays-panel').addEventListener('click', closeHolidaysPanel);
+    holidaysPanel.addEventListener('click', (e) => {
+      if (e.target === holidaysPanel) closeHolidaysPanel();
+    });
 
     document.getElementById('countdowns-btn').addEventListener('click', () => {
       if (countdownsPanel.classList.contains('hidden')) {
@@ -4134,6 +4135,9 @@
       }
     });
     document.getElementById('close-countdowns-panel').addEventListener('click', closeCountdownsPanel);
+    countdownsPanel.addEventListener('click', (e) => {
+      if (e.target === countdownsPanel) closeCountdownsPanel();
+    });
     document.getElementById('countdown-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const nameInput = document.getElementById('countdown-name');
@@ -4172,6 +4176,9 @@
       }
     });
     document.getElementById('close-birthdays-panel').addEventListener('click', closeBirthdaysPanel);
+    birthdaysPanel.addEventListener('click', (e) => {
+      if (e.target === birthdaysPanel) closeBirthdaysPanel();
+    });
 
     document.getElementById('event-birthday').addEventListener('change', (e) => {
       const recurrence = document.getElementById('event-recurrence');
@@ -4207,6 +4214,10 @@
     });
 
     document.getElementById('settings-btn').addEventListener('click', () => openSettings(state));
+    const backupRow = document.getElementById('nav-backup');
+    const aboutRow = document.getElementById('nav-about');
+    if (backupRow) backupRow.addEventListener('click', closeSettings);
+    if (aboutRow) aboutRow.addEventListener('click', closeSettings);
     document.getElementById('close-settings').addEventListener('click', closeSettings);
     document.getElementById('settings-modal').addEventListener('click', (e) => {
       if (e.target.id === 'settings-modal') closeSettings();
