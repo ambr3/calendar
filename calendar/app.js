@@ -93,6 +93,40 @@
     return { minutes, endMin };
   }
 
+  /* Side-by-side lanes for events that overlap in one week column.
+     Back-to-back events (one ends as the next starts) share a lane. */
+  function assignWeekLanes(evs, key) {
+    const items = (evs || []).map((ev) => {
+      const span = weekEventMinutes(ev, key);
+      return { ev, minutes: span.minutes, endMin: span.endMin, lane: 0, cols: 1 };
+    });
+    items.sort((a, b) => a.minutes - b.minutes || b.endMin - a.endMin);
+    let cluster = [];
+    let clusterEnd = -1;
+    const flush = (group) => {
+      const laneEnds = [];
+      for (const item of group) {
+        let lane = 0;
+        while (lane < laneEnds.length && laneEnds[lane] > item.minutes) lane += 1;
+        laneEnds[lane] = item.endMin;
+        item.lane = lane;
+      }
+      const cols = Math.max(laneEnds.length, 1);
+      for (const item of group) item.cols = cols;
+    };
+    for (const item of items) {
+      if (cluster.length && item.minutes >= clusterEnd) {
+        flush(cluster);
+        cluster = [];
+        clusterEnd = -1;
+      }
+      cluster.push(item);
+      if (item.endMin > clusterEnd) clusterEnd = item.endMin;
+    }
+    if (cluster.length) flush(cluster);
+    return items;
+  }
+
   const LANGS = {
     en: {
       months: [
@@ -288,6 +322,7 @@
   const HOLIDAY_COLOR = '#dc2626';
   const IMPORTANT_COLOR = '#f97316';
   const STORAGE_MAX_BYTES = 4 * 1024 * 1024;
+  const MAX_STORED_EVENTS = 10000;
   const REMINDER_MINUTES = [0, 10, 30, 60, 1440];
   const DEFAULT_COUNTRIES = ['uk'];
   const DEFAULT_IMPORTANT_DATES = ['valentines', 'halloween', 'mothers_day', 'fathers_day', 'new_years_eve'];
@@ -2152,7 +2187,15 @@
           const [hh, mm] = ev.time.split(':').map(Number);
           start.setHours(hh, mm, 0, 0);
           let end;
-          if (ev.endTime) {
+          if (ev.endDate && ev.endDate > key) {
+            end = parseDateKey(ev.endDate);
+            if (ev.endTime) {
+              const [eh, em] = ev.endTime.split(':').map(Number);
+              end.setHours(eh, em, 0, 0);
+            } else {
+              end.setHours(23, 59, 0, 0);
+            }
+          } else if (ev.endTime) {
             end = new Date(start);
             const [eh, em] = ev.endTime.split(':').map(Number);
             end.setHours(eh, em, 0, 0);
@@ -2284,7 +2327,6 @@
       return;
     }
     const merge = !!(opts && opts.merge);
-    const MAX_ICS_EVENTS = 10000;
     const unfolded = [];
     for (const l of text.split(/\r?\n/)) {
       if (/^[ \t]/.test(l) && unfolded.length) unfolded[unfolded.length - 1] += l.trim();
@@ -2315,11 +2357,19 @@
     }
 
     const previousEvents = state.events;
-    if (!merge) state.events = {};
+    let snapshot = null;
+    if (merge) {
+      snapshot = {};
+      for (const [k, arr] of Object.entries(previousEvents || {})) {
+        snapshot[k] = Array.isArray(arr) ? arr.slice() : [];
+      }
+    } else {
+      state.events = {};
+    }
 
     let count = 0;
     for (const v of items) {
-      if (count >= MAX_ICS_EVENTS) break;
+      if (count >= MAX_STORED_EVENTS) break;
       const startProp = Object.keys(v).find((k) => k === 'DTSTART' || k.startsWith('DTSTART;'));
       const dtstart = startProp ? v[startProp] : '';
       if (!dtstart || !v.SUMMARY) continue;
@@ -2395,9 +2445,40 @@
       alert('No events found in this .ics file');
       return;
     }
+    if (eventCount(state.events) > MAX_STORED_EVENTS) {
+      state.events = merge ? snapshot : previousEvents;
+      alert('Too many events after merge (max 10000)');
+      return;
+    }
     saveEvents(state);
     onDone();
     alert(`Imported ${count} event(s)`);
+  }
+
+  function eventCount(events) {
+    let n = 0;
+    if (!events || typeof events !== 'object') return 0;
+    for (const arr of Object.values(events)) {
+      if (Array.isArray(arr)) n += arr.length;
+    }
+    return n;
+  }
+
+  /* How many events a merge would store, counting an incoming id only once per day. */
+  function mergedEventCount(current, incoming) {
+    let total = eventCount(current);
+    for (const [key, evs] of Object.entries(incoming || {})) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !Array.isArray(evs)) continue;
+      const have = new Set((current[key] || []).map((e) => e && e.id));
+      for (const raw of evs) {
+        const ev = sanitizeEvent(raw);
+        if (!ev || have.has(ev.id)) continue;
+        have.add(ev.id);
+        total += 1;
+        if (total > MAX_STORED_EVENTS) return total;
+      }
+    }
+    return total;
   }
 
   function validateCalendarImport(data) {
@@ -2413,6 +2494,9 @@
   function applyCalendarImport(state, data, opts) {
     const validation = validateCalendarImport(data);
     const merge = !!(opts && opts.merge);
+    if (merge && mergedEventCount(state.events, data.events) > MAX_STORED_EVENTS) {
+      throw new Error('Too many events after merge (max 10000)');
+    }
     if (merge) {
       for (const [key, evs] of Object.entries(data.events)) {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || !Array.isArray(evs)) continue;
@@ -2885,14 +2969,17 @@
       }
 
       const evs = getEventsForKey(state, key);
-      evs.forEach((ev) => {
+      assignWeekLanes(evs, key).forEach((item) => {
+        const ev = item.ev;
         const pill = document.createElement('div');
         pill.className = 'week-event';
         pill.style.background = safeCssColor(ev.color);
         if (ev.holiday) pill.classList.add('holiday');
-        const span = weekEventMinutes(ev, key);
-        pill.style.top = (span.minutes / 60) * hourPx + 'px';
-        pill.style.height = Math.max(((span.endMin - span.minutes) / 60) * hourPx, 22) + 'px';
+        pill.style.top = (item.minutes / 60) * hourPx + 'px';
+        pill.style.height = Math.max(((item.endMin - item.minutes) / 60) * hourPx, 22) + 'px';
+        pill.style.left = `calc(${(item.lane / item.cols) * 100}% + 2px)`;
+        pill.style.width = `calc(${100 / item.cols}% - 4px)`;
+        pill.style.right = 'auto';
         pill.textContent = (ev.time ? ev.time.slice(0, 5) + ' ' : '') + ev.title;
         pill.title = ev.title;
         if (!ev.holiday && !ev.important) {
@@ -3499,7 +3586,7 @@
     if (!sorted.length) {
       const hint = document.createElement('div');
       hint.className = 'section-hint';
-      hint.textContent = 'Add your own occasions above — trips, deadlines, holidays.';
+      hint.textContent = 'Add your own occasions below — trips, deadlines, holidays.';
       customs.appendChild(hint);
     }
     for (const { cd, target } of sorted) {
@@ -3557,7 +3644,7 @@
     const bdays = collectBirthdays(state, todayKey);
     emptyEl.textContent = bdays.length
       ? ''
-      : 'No birthdays yet. Check "This is a birthday" when adding an event, or create a yearly repeating event.';
+      : 'No birthdays yet. Check "This is a birthday" when adding an event.';
     for (const { ev, next, days } of bdays) {
       const d = parseDateKey(next);
       const item = document.createElement('div');
@@ -3639,8 +3726,7 @@
     for (const [key, evs] of Object.entries(state.events)) {
       for (const ev of evs) {
         if (seen.has(ev.id)) continue;
-        const isBirthday = ev.birthday || (ev.recurrence && ev.recurrence.frequency === 'yearly');
-        if (!isBirthday) continue;
+        if (ev.birthday !== true) continue;
         seen.add(ev.id);
         const d = parseDateKey(key);
         const next = nextAnnualDate(d.getMonth() + 1, d.getDate(), todayKey);
@@ -4318,6 +4404,8 @@
       dayOffset,
       timeToMinutes,
       weekEventMinutes,
+      assignWeekLanes,
+      collectBirthdays,
       formatTime,
       formatTimeRange,
       isRecurringOnDate,

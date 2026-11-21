@@ -155,6 +155,20 @@ function eq(name, got, want) {
   }, { merge: true });
   eq("merge keeps existing countdowns when omitted", mergeState.countdowns.length, 1);
   check("merge adds events", (mergeState.events["2026-01-01"] || []).length === 1);
+
+  const crowded = core.createInitialState();
+  crowded.events = {
+    "2026-01-01": Array.from({ length: 6000 }, (_, i) => ({ id: "old-" + i, title: "Old" })),
+  };
+  const incoming = {
+    "2026-01-02": Array.from({ length: 5000 }, (_, i) => ({ id: "new-" + i, title: "New" })),
+  };
+  let mergeMsg = "";
+  try { core.applyCalendarImport(crowded, { events: incoming }, { merge: true }); }
+  catch (e) { mergeMsg = e.message; }
+  check("merge rejects a total over 10000", /Too many events after merge/.test(mergeMsg), mergeMsg);
+  eq("rejected merge keeps the original events", crowded.events["2026-01-01"].length, 6000);
+  check("rejected merge does not add the new day", crowded.events["2026-01-02"] == null);
 }
 
 /* -------------------------------------------------------------- sanitising */
@@ -214,6 +228,69 @@ function eq(name, got, want) {
   const day = imported.events["2026-11-06"] || [];
   check("ics import reads SUMMARY with parameters", day.length === 1 && day[0].title === "Dentist",
     JSON.stringify(day));
+
+  const spanState = core.createInitialState();
+  spanState.events = {
+    "2026-11-02": [{
+      id: "trip",
+      title: "Trip",
+      time: "09:00",
+      endTime: "17:00",
+      endDate: "2026-11-06",
+    }],
+  };
+  const spanIcs = core.icsExportContent(spanState);
+  check("timed span exports the end day and time", /DTEND:20261106T170000/.test(spanIcs), spanIcs);
+  check("timed span exports the start", /DTSTART:20261102T090000/.test(spanIcs), spanIcs);
+  const round = core.createInitialState();
+  core.importIcs(round, () => {}, spanIcs, { merge: false });
+  const trip = (round.events["2026-11-02"] || [])[0] || {};
+  eq("timed span round-trips endDate", trip.endDate, "2026-11-06");
+  eq("timed span round-trips endTime", trip.endTime, "17:00");
+
+  const icsCrowded = core.createInitialState();
+  icsCrowded.events = {
+    "2026-02-01": Array.from({ length: 6000 }, (_, i) => ({ id: "keep-" + i, title: "Keep" })),
+  };
+  const extra = ["BEGIN:VCALENDAR"];
+  for (let i = 0; i < 5000; i++) {
+    extra.push(
+      "BEGIN:VEVENT",
+      "UID:add-" + i + "@seclusacalendar",
+      "DTSTART:20260301T090000",
+      "SUMMARY:Add " + i,
+      "END:VEVENT",
+    );
+  }
+  extra.push("END:VCALENDAR");
+  core.importIcs(icsCrowded, () => {}, extra.join("\r\n"), { merge: true });
+  eq("ics merge over the cap leaves existing events", icsCrowded.events["2026-02-01"].length, 6000);
+  check("ics merge over the cap adds nothing", icsCrowded.events["2026-03-01"] == null);
+}
+
+/* --------------------------------------------------------------- week lanes */
+{
+  const laid = core.assignWeekLanes([
+    { title: "A", time: "09:00", endTime: "11:00" },
+    { title: "B", time: "10:00", endTime: "12:00" },
+    { title: "C", time: "13:00", endTime: "14:00" },
+  ], "2026-11-06");
+  const byTitle = Object.fromEntries(laid.map((item) => [item.ev.title, item]));
+  eq("overlapping week events take two lanes", [byTitle.A.lane, byTitle.A.cols, byTitle.B.lane, byTitle.B.cols], [0, 2, 1, 2]);
+  eq("a later week event keeps the full column", [byTitle.C.lane, byTitle.C.cols], [0, 1]);
+}
+
+/* -------------------------------------------------------------- birthdays */
+{
+  const found = core.collectBirthdays({
+    events: {
+      "2026-03-01": [
+        { id: "rent", title: "Rent", recurrence: { frequency: "yearly", interval: 1 } },
+        { id: "ada", title: "Ada", birthday: true },
+      ],
+    },
+  }, "2026-11-21");
+  eq("birthdays list only marked birthdays", found.map((row) => row.ev.id), ["ada"]);
 }
 
 /* ----------------------------------------------------------- ICS datetime */

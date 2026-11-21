@@ -2,6 +2,15 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.14 — 2026-11-21
+
+### Fixed
+- Timed events that span several days keep their end day in an iCalendar export.
+- Merging a backup or an iCalendar file cannot grow the calendar past 10,000 events.
+- Overlapping events in week view sit side by side.
+- Birthdays lists only events marked as a birthday.
+- The empty countdown hint points at the form below the list.
+
 ## 0.3.13 — 2026-11-21
 
 ### Changed
