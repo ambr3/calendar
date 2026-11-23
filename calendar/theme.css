@@ -2238,6 +2238,106 @@
   }
 }
 
+@media (orientation: landscape) and (min-width: 560px) {
+  #pane-calendar #app {
+    max-width: 900px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  #calendar {
+    padding: 10px;
+  }
+
+  #month-view {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 6px;
+  }
+
+  #weekday-header {
+    grid-column: 2;
+    grid-row: 1;
+    padding-bottom: 0;
+  }
+
+  #days-grid {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .month-deck {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 20px 24px;
+    justify-content: center;
+  }
+
+  .month-deck-weekday {
+    font-size: clamp(0.95rem, min(10cqh, 11cqw), 2rem);
+  }
+
+  .month-deck-num {
+    margin-top: 4px;
+    font-size: min(68cqw, 72cqh);
+  }
+
+  .month-deck-next {
+    width: 100%;
+    margin-top: 10px;
+    padding-top: 10px;
+    font-size: clamp(0.85rem, min(7cqh, 5.5cqw), 1.1rem);
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 768px) {
+  #pane-calendar #app {
+    padding-left: max(24px, env(safe-area-inset-left));
+    padding-right: max(24px, env(safe-area-inset-right));
+  }
+}
+
+@media (orientation: landscape) and (min-width: 560px) and (max-height: 520px) {
+  #pane-calendar header.cal-top {
+    padding: max(6px, env(safe-area-inset-top)) 0 6px;
+  }
+
+  #pane-calendar #toolbar {
+    padding: 0 0 6px;
+  }
+
+  #pane-calendar .site-foot {
+    padding: 4px 0 calc(4px + env(safe-area-inset-bottom));
+  }
+
+  #days-grid {
+    gap: 4px;
+  }
+
+  .day-cell {
+    border-radius: 14px;
+  }
+
+  .month-deck {
+    padding: 12px 18px;
+  }
+
+  .month-deck-next {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+}
+
 @media (max-width: 360px) {
   #pane-calendar header h1 {
     font-size: 1.05rem;

@@ -2,6 +2,11 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.17 — 2026-11-23
+
+### Changed
+- In landscape view, the date card sits on the left and the calendar grid sits on the right.
+
 ## 0.3.16 — 2026-11-21
 
 ### Fixed
