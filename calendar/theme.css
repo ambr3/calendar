@@ -446,7 +446,7 @@
   flex: 0 0 auto;
   margin-top: 0.6cqh;
   padding-top: 1.8cqh;
-  width: 64%;
+  width: 100%;
   border-top: 1px solid color-mix(in srgb, currentColor 32%, transparent);
   font-size: max(0.95rem, 4.8cqh);
   font-weight: 600;

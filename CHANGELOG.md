@@ -2,6 +2,11 @@
 
 All notable changes to **Seclusa Calendar**.
 
+## 0.3.18 — 2026-11-24
+
+### Fixed
+- The status line on the date card uses the full card width in portrait so "Nothing on, time to relax" is not clipped on narrow phones.
+
 ## 0.3.17 — 2026-11-23
 
 ### Changed
